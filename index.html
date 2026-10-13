@@ -634,9 +634,11 @@ function gasAssets(){return {
   upload:async blob=>{const b64=await new Promise((res,rej)=>{const fr=new FileReader();fr.onload=()=>res(String(fr.result).split(',')[1]);fr.onerror=rej;fr.readAsDataURL(blob)});
     const r=await gas('upload',{b64,type:blob.type||'image/jpeg'});return {id:r.id,url:''}},
   delete:async id=>{await gas('photoDel',null,'&id='+encodeURIComponent(id));return {}}}}
+const PH_BLANK='data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7',
+  PH_MISSING="data:image/svg+xml,"+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 400"><rect width="300" height="400" fill="#1b1e33"/><text x="150" y="205" text-anchor="middle" font-family="Inter,Arial" font-size="18" fill="#9a99a8">Photo not found</text></svg>');
 function photoSrc(id){if(PHOTOS[id])return PHOTOS[id];
-  if(!photoLoading[id]){photoLoading[id]=1;gas('photo',null,'&id='+encodeURIComponent(id)).then(r=>{PHOTOS[id]=r.data;schedule()}).catch(()=>{})}
-  return 'data:image/gif;base64,R0lGODlhAQABAAAAACw='}
+  if(!photoLoading[id]){photoLoading[id]=1;gas('photo',null,'&id='+encodeURIComponent(id)).then(r=>{PHOTOS[id]=r.data;schedule()}).catch(()=>{PHOTOS[id]=PH_MISSING;schedule()})}
+  return PH_BLANK}
 function connectCard(){if(hasClaude())return '';
   return `<section class="card"><div class="card-h"><h2>App backend</h2><span class="aside">${mode==='gas'?(outbox.length?outbox.length+' edits waiting':'Connected'):'Not connected'}</span></div>
     <p class="note" style="margin:0 0 10px">Your Apps Script web app keeps your data in Google Drive and runs the coach. Paste its /exec address and token once on each device.</p>
