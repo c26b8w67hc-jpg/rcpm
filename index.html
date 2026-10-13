@@ -189,6 +189,10 @@ main>.card:first-child,main>details:first-child{margin-top:16px}
 .ph{margin:0}.ph img{display:block;width:100%;aspect-ratio:3/4;object-fit:cover;background:var(--empty);border-radius:var(--r-sm)}
 .ph figcaption{font:400 12px/1.3 var(--f);color:var(--muted);margin-top:6px}.ph figcaption b{color:var(--ink);font-weight:500}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:0 10px}
+.ph-pick{position:relative;display:flex;align-items:center;justify-content:center;aspect-ratio:3/4;border-radius:var(--r-sm);background:var(--card);border:1.5px dashed var(--line2);overflow:hidden;cursor:pointer;color:var(--muted);font:300 40px/1 var(--f);text-transform:none;letter-spacing:0}
+.ph-pick img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:0}
+.ph-pick.busy::after{content:"";position:absolute;inset:0;background:rgba(11,13,23,.5) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='9' fill='none' stroke='%23F4F1EA' stroke-width='2' stroke-dasharray='40 20'/%3E%3C/svg%3E") center/28px no-repeat}
+.ph-slot figcaption{text-transform:none}
 .sheet-seg{position:static;margin:0 0 14px;padding:4px;grid-template-columns:1fr 1fr}
 .pd{padding:12px 0;border-top:1px solid var(--line)}.pd.now{border-top:1px solid var(--hot)}
 .pd-h{display:flex;align-items:baseline;gap:8px}.pd-h b{font:500 17px/1.2 var(--f)}.pd-h small{margin-left:auto;font:400 12px/1 var(--f);color:var(--muted)}
@@ -611,7 +615,7 @@ async function gasLoad(){
     dataVer++;saveLocal();if(!setDirty())setDraft=null;schedule();flush()}
   catch(e){if(e&&e.code==='bad_token')toast('The app’s backend token is wrong. Fix it in Setup.');else console.warn('load',e)}}
 window.addEventListener('online',flush);
-document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&mode==='gas'){flush();gasLoad()}});
+let lastGasLoad=0;document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&mode==='gas'){flush();if($('#sheet').hidden&&Date.now()-lastGasLoad>3e5){lastGasLoad=Date.now();gasLoad()}}});
 // Claude through the backend: same shape as claude.ai's sample (AI(input, opts) → {text}; AI.json → parsed)
 function gasAI(){
   const call=async(input,opts={})=>{
@@ -726,30 +730,32 @@ function exerciseIndex(){
 const navyBF=(waist,neck,h)=>waist&&neck&&h&&waist>neck?Math.round((495/(1.0324-0.19077*Math.log10(waist-neck)+0.15456*Math.log10(h))-450)*10)/10:null;
 const bodyDays=()=>Object.keys(S.body).filter(isDate).sort();
 const blob=id=>useGas()?photoSrc(id):'/_blob/'+id;
-let bodyFiles=[],cmpA=null;
+let bodyFiles=[],bodyNew={},cmpA=null;
+// old entries may carry two 'side' labels: the first photo of a day is the front
+const posed=ph=>{const f=ph.find(x=>x.pose==='front');return {front:f||ph[0]||null,side:ph.find(x=>x!==(f||ph[0])&&x.pose==='side')||ph.find(x=>x!==(f||ph[0]))||null}};
 function bodyBF(b){return b?navyBF(num(b.waist),num(b.neck),num(S.settings.heightCm)||190):null}
-function openBody(d){d=d||sel;const b=S.body[d]||{},ph=(b.photos||[]);bodyFiles=[];
+function openBody(d){d=d||sel;const b=S.body[d]||{},ph=(b.photos||[]),P=posed(ph);bodyNew={};
   openSheet(head('Body · '+fmtDay(d))+`<div class="grid2">
-    <label>Waist at the navel (cm)<input id="b_waist" type="text" inputmode="decimal" value="${b.waist??''}"></label>
-    <label>Neck under the Adam's apple (cm)<input id="b_neck" type="text" inputmode="decimal" value="${b.neck??''}"></label>
+    <label>Waist (cm)<input id="b_waist" type="text" inputmode="decimal" value="${b.waist??''}"></label>
+    <label>Neck (cm)<input id="b_neck" type="text" inputmode="decimal" value="${b.neck??''}"></label>
     <label>Chest (cm, optional)<input id="b_chest" type="text" inputmode="decimal" value="${b.chest??''}"></label>
     <label>Arm, flexed (cm, optional)<input id="b_arm" type="text" inputmode="decimal" value="${b.arm??''}"></label></div>
-    <p class="note">Measure in the morning, relaxed, tape level and snug. Waist and neck give the body-fat estimate (US Navy method, about ±3%).</p>
+    <p class="note">Morning, relaxed, tape level and snug: waist at the navel, neck just below the Adam's apple. Waist and neck give the body-fat estimate (US Navy method, about ±3%).</p>
     ${ASSETS?`<h3 style="margin-top:14px">Progress photos</h3>
-      ${ph.length?`<div class="ph-row">${ph.map((x,i)=>`<figure class="ph"><img src="${blob(x.id)}" alt="${esc(x.pose||'Photo')} ${fmtDay(d)}"><figcaption>${esc(x.pose||'')} <button class="linkbtn" data-a="bodyPhDel" data-d="${d}" data-i="${i}">Remove</button></figcaption></figure>`).join('')}</div>`:''}
-      ${ph.length<2?`<label class="drop">${ph.length?'Add a side photo':'Add front and side photos'}<input type="file" id="bodyIn" accept="image/*" multiple></label><div class="thumbs" id="bThumbs"></div>
-      <p class="note">Same spot, same light, same time of day (Sunday morning, before eating). Only you can see these.</p>`:''}`
+      <div class="ph-row">${['front','side'].map(pose=>{const x=P[pose];return `<figure class="ph ph-slot"><label class="ph-pick" id="slot-${pose}">${x?`<img src="${blob(x.id)}" alt="${pose} ${fmtDay(d)}">`:`<span class="ph-add">+</span>`}<input type="file" accept="image/*" data-pose="${pose}" class="sr"></label><figcaption>${pose==='front'?'Front':'Side'}${x?` · <button class="linkbtn" data-a="bodyPhDel" data-d="${d}" data-id="${x.id}">Remove</button>`:''}</figcaption></figure>`}).join('')}</div>
+      <p class="note">Tap a slot to take or replace that photo. Same spot, same light, Sunday morning before eating. Only you can see these.</p>`
       :'<p class="note">Progress photos need the app opened from its claude.ai link.</p>'}
     <div class="actions"><button class="btn primary" data-a="bodySave" data-d="${d}">Save</button></div>`)}
 async function bodySave(d){const btn=document.querySelector('[data-a=bodySave]');
   const cur=clean(S.body[d]||{}),o={...cur};['waist','neck','chest','arm'].forEach(k=>{const v=num($('#b_'+k).value);if(v!=null)o[k]=v;else delete o[k]});
-  if(bodyFiles.length&&ASSETS){if(btn){btn.disabled=true;btn.innerHTML=busy('Uploading…')}const ph=[...(o.photos||[])];
-    for(const f of bodyFiles.slice(0,2-ph.length)){try{const sm=await shrinkImage(f,1400);const r=await ASSETS.upload(sm);ph.push({id:r.id,pose:ph.length?'side':'front'})}
+  const poses=Object.keys(bodyNew),gone=[];
+  if(poses.length&&ASSETS){if(btn){btn.disabled=true;btn.innerHTML=busy('Uploading…')}const P=posed(o.photos||[]),out={front:P.front,side:P.side};
+    for(const pose of poses){try{const r=await ASSETS.upload(bodyNew[pose].blob);if(out[pose])gone.push(out[pose].id);out[pose]={id:r.id,pose}}
       catch(e){if(btn){btn.disabled=false;btn.textContent='Save'}toast(e&&e.code==='quota_exceeded'?'Photo storage is full. Remove some old photos first.':'Couldn’t upload that photo. Try again.');return}}
-    o.photos=ph}
+    o.photos=['front','side'].filter(k=>out[k]).map(k=>({id:out[k].id,pose:k}))}
   if(!Object.keys(o).length){closeSheet();return}
-  sheetDirty=false;closeSheet();await safe(()=>put('body',d,o),'Body logged')}
-async function bodyPhDel(d,i){const b=S.body[d];if(!b||!b.photos)return;const ph=[...b.photos],[x]=ph.splice(i,1);
+  sheetDirty=false;closeSheet();if(await safe(()=>put('body',d,o),'Body logged')&&ASSETS)gone.forEach(id=>ASSETS.delete(id).catch(()=>{}))}
+async function bodyPhDel(d,id){const b=S.body[d];if(!b||!b.photos)return;const ph=b.photos.filter(p=>p.id!==id),x=b.photos.find(p=>p.id===id);
   await safe(()=>put('body',d,{...clean(b),photos:ph}));if(ASSETS&&x)try{await ASSETS.delete(x.id)}catch(e){}openBody(d)}
 function bodyCard(){const ds=bodyDays(),m=ds.filter(d=>S.body[d].waist!=null),last=m[m.length-1],first=m[0];
   const L=last?S.body[last]:null,F=first?S.body[first]:null,bf=bodyBF(L),bf0=bodyBF(F),df=(a,b,u)=>a!=null&&b!=null&&a!==b?` <small>${a-b>0?'+':'−'}${r1(Math.abs(a-b))}${u} since ${fmtShort(first)}</small>`:'';
@@ -1323,7 +1329,7 @@ function requestClose(){
   b.innerHTML='<span>Discard what you’ve entered?</span><button class="btn small" data-a="keepSheet">Keep editing</button><button class="btn small primary" data-a="discardSheet">Discard</button>';
   $('#sheetBody').prepend(b);$('.sheet').scrollTop=0;b.querySelector('[data-a=discardSheet]').focus({preventScroll:true});
 }
-function closeSheet(){sheetDirty=false;if(coachCtl){coachCtl.abort();coachCtl=null}const w=$('#sheet');w.classList.remove('in');setTimeout(()=>{if(!w.classList.contains('in')){w.hidden=true;$('#sheetBody').innerHTML=''}},230);document.body.style.overflow='';drafts=null;mealDraft=null;scanFiles=[];mealFile=null;ouraFiles=[];ouraShots=[];bodyFiles=[];if(sheetOpener&&document.contains(sheetOpener))sheetOpener.focus({preventScroll:true});sheetOpener=null}
+function closeSheet(){sheetDirty=false;if(coachCtl){coachCtl.abort();coachCtl=null}const w=$('#sheet');w.classList.remove('in');setTimeout(()=>{if(!w.classList.contains('in')){w.hidden=true;$('#sheetBody').innerHTML=''}},230);document.body.style.overflow='';drafts=null;mealDraft=null;scanFiles=[];mealFile=null;ouraFiles=[];ouraShots=[];bodyFiles=[];Object.values(bodyNew).forEach(x=>URL.revokeObjectURL(x.url));bodyNew={};if(sheetOpener&&document.contains(sheetOpener))sheetOpener.focus({preventScroll:true});sheetOpener=null}
 const XI='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>';
 const head=t=>`<div class="sh-h"><h2 id="sheetTitle">${t}</h2><button class="x" data-a="close" aria-label="Close">${XI}</button></div>`;
 const busy=t=>`<span class="spin" aria-hidden="true"></span>${t}`;
@@ -2251,7 +2257,7 @@ const A={
   suppAll:async()=>{const d=sel,prev=clean((S.supps[d]&&S.supps[d].taken)||{}),cur={};S.settings.stack.forEach(s=>cur[s.name]=prev[s.name]||(d===today()?hhmm():true));if(await safe(()=>put('supps',d,{taken:cur})))toast('All supplements ticked',()=>safe(()=>put('supps',d,{taken:prev})))},
   toastUndo:()=>{const u=toast._undo;$('#toast').hidden=true;toast._undo=null;if(u)u()},
   openScan:()=>openScan(),runScan:()=>runScan(),openPicker:()=>openPicker(),
-  openBody:()=>openBody(today()),bodySave:b=>bodySave(b.dataset.d),bodyPhDel:b=>bodyPhDel(b.dataset.d,+b.dataset.i),
+  openBody:()=>openBody(today()),bodySave:b=>bodySave(b.dataset.d),bodyPhDel:b=>bodyPhDel(b.dataset.d,b.dataset.id),
   openPlan:()=>openPlan(),genPlan:()=>genPlan(($('#planNote')||{}).value||''),planRedo:()=>{planTab='days';delete S.plans[planWeek()];planErr='';openPlan()},planTab:b=>openPlan(b.dataset.p),
   planLog:b=>planLog(b.dataset.w,b.dataset.sl,+b.dataset.i),
   shopTick:async b=>{const p=S.plans[b.dataset.w];if(!p)return;const got={...(p.got||{})},i=b.dataset.i;if(got[i])delete got[i];else got[i]=true;await safe(()=>put('plans',b.dataset.w,{...clean(p),got}));openPlan('shop')},
@@ -2333,7 +2339,10 @@ function thumbs(target,files){const t=$(target);if(!t)return;t.querySelectorAll(
 document.addEventListener('change',e=>{
   if(e.target.id==='lx_kind'){labKindChange();return}
   if(e.target.id==='cmpPick'){cmpA=e.target.value;render();return}
-  if(e.target.id==='bodyIn'){bodyFiles=[...e.target.files].slice(0,2);thumbs('#bThumbs',bodyFiles);if(bodyFiles.length)sheetDirty=true;return}
+  if(e.target.dataset&&e.target.dataset.pose){const pose=e.target.dataset.pose,f=e.target.files&&e.target.files[0],slot=document.getElementById('slot-'+pose);if(!f||!slot)return;
+    slot.classList.add('busy');shrinkImage(f,1400).then(sm=>{if(bodyNew[pose])URL.revokeObjectURL(bodyNew[pose].url);const url=URL.createObjectURL(sm);bodyNew[pose]={blob:sm,url};sheetDirty=true;
+      const img=slot.querySelector('img')||slot.insertBefore(document.createElement('img'),slot.firstChild);img.src=url;const add=slot.querySelector('.ph-add');if(add)add.remove();slot.classList.remove('busy');e.target.value=''})
+      .catch(()=>{slot.classList.remove('busy');toast('Couldn’t read that photo. Try again.')});return}
   const el=e.target;
   if(el.id==='exPick'){exSel=el.value;render();return}
   if(el.id==='scanIn'){scanFiles=[...el.files].slice(0,MAXIMG);thumbs('#thumbs',scanFiles);$('#scanGo').disabled=!scanFiles.length;if(scanFiles.length){sheetDirty=true;Promise.all(scanFiles.map(f=>shrinkImage(f,2200))).then(fs=>{scanFiles=fs;runScan()})}if(el.files.length>MAXIMG)$('#scanMsg').textContent=`Using the first ${MAXIMG}; scan the rest after.`;return}
