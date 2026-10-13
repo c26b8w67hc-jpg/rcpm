@@ -998,6 +998,16 @@ function tileWall(){
 const FBN_KEY='recomplog.fbNudge';
 const noExercises=w=>w.kind==='gym'&&!(w.exercises||[]).some(e=>e&&e.name);
 function missingGym(){const t=today();return [...Array(14)].map((_,i)=>addDays(t,-i)).flatMap(d=>workoutsOn(d).filter(noExercises)).sort((a,b)=>a.date.localeCompare(b.date))}
+// Data freshness: silent while everything flows; one warning once something is more than a day old.
+function staleAlarm(){if(!S.settings.ouraSheetId)return '';const now=Date.now(),t=today(),issues=[];
+  const l=lastOuraSync();if(ouraSyncBad&&ouraSyncMsg)issues.push(esc(ouraSyncMsg));
+  else if(!l||now-l.at>864e5){const h=l?Math.round((now-l.at)/36e5):0,d=Math.round(h/24);issues.push(`The app last pulled your data ${!l?'never':h<48?h+' hours ago':d+' days ago'}.`)}
+  const od=Object.keys(S.oura).filter(d=>isDate(d)&&(S.oura[d].readiness!=null||S.oura[d].sleepScore!=null)).sort().pop();
+  if(od&&dayNum(t)-dayNum(od)>=2)issues.push(`Ring data stops at ${fmtDay(od)}. Open the Oura app so the ring syncs.`);
+  const cu=calRows().rows.map(r=>Date.parse(r.updatedAt)).filter(Number.isFinite).sort((a,b)=>b-a)[0];
+  if(cu&&now-cu>864e5)issues.push(`Your calendar hasn’t updated since ${new Date(cu).toLocaleDateString('en-GB',{weekday:'short',day:'numeric'})}. Check the calendar script.`);
+  if(!issues.length)return '';
+  return `<section class="nudge"><div class="nudge-t"><b>Something stopped updating</b><small>${issues.join(' ')}</small></div><div class="nudge-a"><button class="btn small primary" data-a="resync">Sync now</button></div></section>`}
 function fitbodNudge(){const m=missingGym(),t=today();if(!m.length)return '';
   let until=null;try{until=localStorage.getItem(FBN_KEY)}catch(e){}if(until&&until>t)return '';
   if(dayNum(t)-dayNum(m[0].date)<3)return '';
@@ -1102,7 +1112,7 @@ function recoveryLine(d){
   const bits=o?[['sleepScore','Sleep'],['readiness','Readiness'],['hrv','HRV'],['sleepHours','']].filter(([k])=>o[k]!=null).map(([k,l])=>k==='sleepHours'?`<span>Slept <b class="num">${r1(o[k])}</b> h</span>`:`<span>${l} <b class="num">${esc(o[k])}</b></span>`):[];
   const syncNote=S.settings.ouraSheetId&&d===today()&&(ouraSyncing||ouraSyncBad)?ouraSyncLine():'';
   return `<div class="lrow"><div class="lmain"><h2 class="lab">Recovery</h2>
-    ${bits.length?`<p class="recov-v">${bits.join('')}</p>`:`<p class="meta">${S.settings.ouraSheetId&&d===today()?'Waiting for the ring to sync.':'No Oura numbers for this day.'}</p>`}${syncNote}</div>
+    ${bits.length?`<p class="recov-v">${bits.join('')}</p>`:`<p class="meta">${S.settings.ouraSheetId&&d===today()?'No ring data yet today.':'No Oura numbers for this day.'}</p>`}${syncNote}</div>
     <button class="btn small ghost" data-a="openOura">${o?'Edit':'Add'}</button></div>`;
 }
 function openPicker(){
@@ -1127,7 +1137,7 @@ progress(){
     ({weight:VIEWS.body,training:VIEWS.train,food:VIEWS.food,recovery:VIEWS.recovery,lab:VIEWS_LAB}[prog]||VIEWS.body)();
 },
 today(){
-  return dropBlock(sel)+(!hasClaude()&&!useGas()?`<section class="nudge"><div class="nudge-t"><b>Connect your data</b><small>This copy of RCMP isn’t linked to your Google backend yet, so it only saves on this device.</small></div><div class="nudge-a"><button class="btn small primary" data-a="tab" data-t="setup">Connect</button></div></section>`:'')+(sel===today()?fitbodNudge():'')+todoList(sel)+tileWall()+logCard(sel);
+  return dropBlock(sel)+(!hasClaude()&&!useGas()?`<section class="nudge"><div class="nudge-t"><b>Connect your data</b><small>This copy of RCMP isn’t linked to your Google backend yet, so it only saves on this device.</small></div><div class="nudge-a"><button class="btn small primary" data-a="tab" data-t="setup">Connect</button></div></section>`:'')+(sel===today()?staleAlarm()+fitbodNudge():'')+todoList(sel)+tileWall()+logCard(sel);
 },
 train(){
   const t=today(),mon=mondayOf(t);
@@ -1163,7 +1173,7 @@ train(){
     ${pl.length>sh.length?`<div class="actions"><button class="btn" data-a="planAll">Show all ${pl.length}</button></div>`:''}</section>`})()}
   <section class="card"><div class="card-h"><h2>Lift progress</h2></div>${prog}</section>
   <section class="card"><div class="card-h"><h2>History</h2><button class="btn small" data-a="openFitbod">Import Fitbod</button></div>
-    <p class="note" style="margin:-4px 0 6px">${nAll} sessions${lastFb?`, Fitbod imported up to ${fmtShort(lastFb)}`:''}</p>${all.length?`<ul class="list">${all.map(w=>sessItem(w).replace('<div class="t">',`<div class="t"><span class="s" style="margin-right:6px">${fmtShort(w.date)}</span>`)).join('')}</ul>${nAll>all.length?`<div class="actions"><button class="btn" data-a="histAll">Show all ${nAll}</button></div>`:''}`:'<p class="empty">No sessions yet.</p>'}</section>`;
+    <p class="note" style="margin:-4px 0 6px">${nAll} sessions</p>${all.length?`<ul class="list">${all.map(w=>sessItem(w).replace('<div class="t">',`<div class="t"><span class="s" style="margin-right:6px">${fmtShort(w.date)}</span>`)).join('')}</ul>${nAll>all.length?`<div class="actions"><button class="btn" data-a="histAll">Show all ${nAll}</button></div>`:''}`:'<p class="empty">No sessions yet.</p>'}</section>`;
 },
 food(){
   const d=sel,ms=mealsOn(d),st=S.settings,t=today();
@@ -1791,7 +1801,7 @@ async function syncOuraSheet(manual){
   ouraSyncing=false;schedule();setTimeout(maybeDaily,0);
 }
 function ouraSyncLine(){
-  if(!S.settings.ouraSheetId)return '';
+  if(!S.settings.ouraSheetId||!ouraSyncBad||ouraSyncing)return '';
   const l=lastOuraSync();
   const when=l?new Date(l.at).toLocaleString('en-GB',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}):null;
   return `<div class="row" style="margin-top:10px"><p class="note" style="margin:0;flex:1">${ouraSyncing?busy('Syncing from your Oura sheet…'):esc(ouraSyncMsg||(when?`Auto-synced from your Oura sheet, last ${when}.`:'Linked to your Oura sheet.'))}</p><button class="btn small" data-a="syncOura" hidden${ouraSyncing?' disabled':''}>Sync now</button></div>`;
@@ -1961,7 +1971,7 @@ function weekCard(){
   return `<section class="card"><div class="card-h"><h2>This week</h2>${has?`<button class="btn small" data-a="genGym"${gymBusy?' disabled':''}>${plan?'Re-plan':'Plan gym'}</button>`:''}</div>
     ${has?`<ul class="wk">${rows}</ul>
       ${gymBusy?`<p class="note">${busy('Fitting your gym sessions around the calendar…')}</p>`:gymErr?`<p class="note err">${esc(gymErr)}</p>`:plan&&plan.note?`<p class="note">${esc(plan.note)}</p>`:!plan?'<p class="note">Tap Plan gym: it picks free slots around work and your classes, and which session to do in each.</p>':''}
-      <p class="note">${c.rows.length?`Calendar synced ${new Date(c.at).toLocaleString('en-GB',{weekday:'short',hour:'2-digit',minute:'2-digit'})}. Corehaus = Lagree, Lapso = Spin, Run = Run.`:'Using your work hours from Setup. Connect your calendar (calendar-sync script) to add your classes and other plans.'}</p>`
+`
     :`<p class="empty">Connect your calendar and this shows your week: fixed classes, busy time, and the best slots for the gym with the session to do. Add <b>calendar-sync</b> to your Apps Script (one paste and one Run).</p>`}</section>`}
 
 /* ---------- rules: the daily call, session, meal and gym-week suggestions, computed here with no AI ---------- */
