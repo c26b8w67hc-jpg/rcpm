@@ -50,7 +50,7 @@ img{max-width:100%}
 /* header: glass strip that floats over the scene */
 .top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:rgba(11,13,23,.38);-webkit-backdrop-filter:var(--glass);backdrop-filter:var(--glass);border-bottom:1px solid var(--line)}
 .top-in{max-width:560px;margin:0 auto;padding:6px 8px 6px 16px;min-height:56px;display:flex;align-items:center;gap:8px}
-.brand{display:flex;align-items:center;gap:10px;flex:1;min-width:0;overflow:hidden}
+.brand{position:relative;display:flex;align-items:center;gap:10px;flex:1;min-width:0;overflow:hidden}
 .logo{flex:none;width:24px;height:24px;display:block;border-radius:50%}
 h1{flex:none;font:600 15px/1 var(--f);letter-spacing:.22em;white-space:nowrap}
 .season{display:none}
@@ -58,7 +58,7 @@ h1{flex:none;font:600 15px/1 var(--f);letter-spacing:.22em;white-space:nowrap}
 .resync:active{background:rgba(255,255,255,.18)}
 .resync svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 .resync.on svg{animation:sp 1s linear infinite}.resync:disabled{opacity:.85}
-.sync{align-self:center;width:7px;height:7px;border-radius:50%;background:var(--line2);flex:none}
+.sync{position:absolute;left:21px;top:calc(50% + 6px);width:8px;height:8px;border-radius:50%;background:var(--line2);box-shadow:0 0 0 2px var(--bg)}
 .sync.db{background:var(--good)}
 .sync.local{background:var(--warn);font-size:0}
 @media (max-width:380px){.resync{padding:0 10px}}
@@ -75,6 +75,7 @@ main>.card:first-child,main>details:first-child{margin-top:16px}
 /* Today hero: a drawn landscape for the time of day, tinted by readiness, with the scores on top */
 .release{position:relative;isolation:isolate;margin:-57px calc(50% - 50vw) 0;padding:calc(57px + 18px) max(16px,calc(50vw - 264px)) 22px;color:var(--ink);min-height:420px;display:flex;flex-direction:column}
 .release>*{position:relative;z-index:1}
+.release.past{min-height:0;padding-bottom:8px}
 .scene{position:absolute!important;inset:0;z-index:0!important;overflow:hidden}
 .scene svg{width:100%;height:100%;display:block}
 .scene::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(11,13,23,.15) 0%,rgba(11,13,23,0) 30%,rgba(11,13,23,.35) 62%,var(--bg) 100%)}
@@ -794,9 +795,9 @@ function labVerdict(x,r){const M=LAB_M[x.metric];
   return r.size===0?`No real difference in ${M[0].toLowerCase()} (${dd}${M[1]?' '+M[1]:''}).`
     :`${M[0]} ${r.good?'better':'worse'} by ${ad}${M[1]?' '+M[1]:''} the next morning; ${r.size===2?'a clear':'a small'} effect.`}
 function labRow(x,r,id){const M=LAB_M[x.metric];
-  return `<li class="lab-r${r.ready&&r.size?(r.good?' good':' bad'):''}"><div class="lab-t"><b>${esc(labName(x))}</b><small>→ next-morning ${M[0].toLowerCase()}</small></div>
+  return `<li class="lab-r${r.ready&&r.size?(r.good?' good':' bad'):''}"><div class="lab-t"><b>${esc(labName(x))}</b><small>→ next-morning ${/^[A-Z]{2,}/.test(M[0])?M[0]:M[0].toLowerCase()}</small></div>
     ${r.on!=null?`<div class="lab-n"><span><small>on</small><b class="num">${fmtM(r.on,x.metric)}</b></span><span><small>off</small><b class="num">${fmtM(r.off,x.metric)}</b></span></div>`:''}
-    <p class="lab-v">${labVerdict(x,r)}${r.ready?` <small>n ${r.n1}/${r.n0}, d ${r.d.toFixed(2)}</small>`:''}</p>
+    <p class="lab-v">${labVerdict(x,r)}${r.ready?` <small>${r.n1} nights on, ${r.n0} off</small>`:''}</p>
     ${id?`<div class="lab-a">${x.kind==='manual'?'':''}<button class="btn small" data-a="labDel" data-id="${id}">Delete</button></div>`:''}</li>`}
 function spotted(){ // what his existing logs already say, no setup needed
   const xs=[...S.settings.stack.map(s=>({kind:'supp',supp:s.name})),{kind:'late'},{kind:'trained'}],out=[];
@@ -1044,10 +1045,10 @@ function dropBlock(d){
   const h=new Date().getHours(),hi=h<5?'Still up':h<12?'Good morning':h<18?'Good afternoon':'Good evening';
   const tint=s?`radial-gradient(90% 60% at 70% 30%,${s[1]},transparent 70%)`:'none';
   const wk=Math.max(0,Math.round((parseYmd(st.goalDate)-parseYmd(t))/6048e5));
-  return `<section class="release" data-cw="${ph}" aria-label="${d===t?'Today':fmtDay(d)}">
+  return `<section class="release${d===t?'':' past'}" data-cw="${ph}" aria-label="${d===t?'Today':fmtDay(d)}">
     <div class="scene">${sceneSVG(ph)}<i class="tint" style="background:${tint}"></i></div>
     <p class="hero-date">${parseYmd(d).toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long'})} · ${st.goalKg} kg in ${wk} weeks</p>
-    ${d===t?`<h2 class="hero-hi">${hi}${st.name?`, <em>${esc(st.name)}</em>`:''}</h2>`:`<h2 class="hero-hi">${fmtDay(d)}</h2>`}
+    ${d===t?`<h2 class="hero-hi">${hi}${st.name?`, <em>${esc(st.name)}</em>`:''}</h2>`:`<h2 class="hero-hi">${(()=>{const n=dayNum(t)-dayNum(d);return n===1?'Yesterday':n<7?n+' days ago':parseYmd(d).toLocaleDateString('en-GB',{weekday:'long'})})()}</h2>`}
     <div class="rings">${ringHTML('Readiness',rd,'recovery')}${ringHTML('Sleep',num(o.sleepScore),'recovery')}${ringHTML('Activity',num(o.activityScore),'training')}</div>
     ${d===t?dailyCard():''}
   </section>`;
@@ -1079,7 +1080,7 @@ function logCard(d){
   // a finished day can be weighed against the ring's full-day burn; today's is still counting
   const bal=d<today()&&o&&o.totalKcal&&t.n?Math.round(t.kcal-o.totalKcal):null;
   return `<section class="log" aria-label="Log for ${d===today()?'today':fmtDay(d)}">
-  <div class="lrow col" id="sec-protein"><div class="lmain"><div class="lhead"><h2 class="lab">Fuel</h2><span class="acts">${AI&&d===today()?`<button class="btn" data-a="openSuggest" data-k="meal">Suggest</button>`:''}<button class="btn primary" data-a="openMeal">Add meal</button></span></div>
+  <div class="lrow col" id="sec-protein"><div class="lmain"><div class="lhead"><h2 class="lab">Fuel</h2><span class="acts">${d===today()?`<button class="btn" data-a="openSuggest" data-k="meal">Suggest</button>`:''}<button class="btn primary" data-a="openMeal">Add meal</button></span></div>
       ${d===today()&&targetDue()?`<p class="due">New target from your last 3 weeks: <b>${targetDue().target} kcal</b> <button class="inline" data-a="goProg" data-p="food">Review</button></p>`:''}
       ${miniMeter('kcal',t.kcal,st.kcal,'kcal',kLeft>=0?`${kLeft} left`:`${-kLeft} over target`)}
       <div class="macros">${macroLine('protein','Protein',t.p,st.protein)}${macroLine('carbs','Carbs',t.c,st.carbs)}${macroLine('fat','Fat',t.f,st.fat)}</div>
@@ -1087,7 +1088,7 @@ function logCard(d){
       <ul class="list tight" id="dayMeals"${mealsOpen?'':' hidden'}>${ms.map(m=>{const x=mealTotals(m);return `<li class="item"><button class="linkbtn body" data-a="editMeal" data-id="${m.id}"><div class="t">${esc(m.title||'Meal')}</div><div class="s">${esc(m.slot)}${m.at?' · '+esc(m.at):''}</div></button><div class="r"><b>${Math.round(x.kcal)}</b> kcal<br>${Math.round(x.p)} g protein</div><button class="x-sm" data-a="delMealRow" data-id="${m.id}" aria-label="Delete ${esc(m.title||'meal')}">${XI}</button></li>`}).join('')}${bal!=null?`<li class="item"><p class="meta" style="margin:0">${bal>0?'+':''}${bal} kcal against the ${o.totalKcal} kcal the ring says you burned.</p></li>`:''}</ul>`:''}</div></div>
   <div class="lrow" id="sec-train"><div class="lmain"><h2 class="lab">Training</h2>
       ${ws.length?`<ul class="list tight">${ws.map(sessItem).join('')}</ul>`:`<p class="meta">Nothing logged ${d===today()?'yet':'this day'}.</p>`}${plannedLine(d)}</div>
-    <span class="acts col">${AI&&d===today()?`<button class="btn" data-a="openSuggest" data-k="session">Suggest</button>`:''}<button class="btn" data-a="openPicker">Add session</button></span></div>
+    <span class="acts col">${d===today()?`<button class="btn" data-a="openSuggest" data-k="session">Suggest</button>`:''}<button class="btn" data-a="openPicker">Add session</button></span></div>
   <div class="lrow" id="sec-stack"><div class="lmain"><h2 class="lab">Stack</h2>
       <button class="linkbtn disclose" data-a="suppToggle" aria-expanded="${suppOpen}" aria-controls="suppChips"><b class="num">${nT}</b><span> of ${nS} taken</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button></div>
     ${nT<nS?(stackConfirmed()?`<button class="btn" data-a="suppAll">Tick all</button>`:`<button class="btn" data-a="tab" data-t="setup">Set up</button>`):`<span class="done" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span>`}
@@ -1184,7 +1185,7 @@ food(){
   const plan=`<section class="card"><div class="card-h"><h2>Meal plan</h2>${AI||pw?`<button class="btn small" data-a="openPlan">${pw?'Open':'Plan the week'}</button>`:''}</div>
     ${planBusy?`<p class="note">${busy(esc(planProg||'Planning your week…'))}</p>`:pt?`<ul class="list tight">${Object.entries(pt.slots).map(([sl,id])=>{const m=pt.p.meals[id];return m?`<li class="pm"><span class="pm-s">${esc(sl)}</span><span class="pm-t">${esc(m.title)}</span></li>`:''}).join('')}</ul>
       ${(pt.p.shop||[]).length?`<p class="note">Shopping: ${Object.values(pt.p.got||{}).filter(Boolean).length} of ${pt.p.shop.length} in the basket.</p>`:''}`
-    :`<p class="empty">${AI?'Plan 7 days of meals on your targets, with a Mercadona list grouped by aisle. Best done on Sunday.':'Planning needs Claude, which works when the app is opened from its claude.ai link.'}</p>`}</section>`;
+    :`<p class="empty">${AI?'Plan 7 days of meals on your targets, with a Mercadona list grouped by aisle. Best done on Sunday.':'Planning needs Claude, which isn’t reachable right now. Check the app backend in Setup.'}</p>`}</section>`;
   return burn+plan+`<section class="card"><div class="card-h"><h2>Last 14 days</h2><span class="aside">${avgK!=null?`avg ${avgK} kcal, ${avgP} g protein`:''}</span></div>
     <div class="bars">${bars}<div class="tline" style="bottom:${st.kcal/max*100}%"></div></div><div class="barlab">${labs}</div>
     <div class="legend"><span><i style="background:var(--ink)"></i>Protein target reached</span><span><i style="background:color-mix(in srgb,var(--ink) 28%,transparent)"></i>Rest of the day’s calories</span><span><i class="dash"></i>${st.kcal} kcal target</span></div></section>`;
@@ -1793,7 +1794,7 @@ function ouraSyncLine(){
   if(!S.settings.ouraSheetId)return '';
   const l=lastOuraSync();
   const when=l?new Date(l.at).toLocaleString('en-GB',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}):null;
-  return `<div class="row" style="margin-top:10px"><p class="note" style="margin:0;flex:1">${ouraSyncing?busy('Syncing from your Oura sheet…'):esc(ouraSyncMsg||(when?`Auto-synced from your Oura sheet, last ${when}.`:'Linked to your Oura sheet.'))}</p><button class="btn small" data-a="syncOura"${ouraSyncing?' disabled':''}>Sync now</button></div>`;
+  return `<div class="row" style="margin-top:10px"><p class="note" style="margin:0;flex:1">${ouraSyncing?busy('Syncing from your Oura sheet…'):esc(ouraSyncMsg||(when?`Auto-synced from your Oura sheet, last ${when}.`:'Linked to your Oura sheet.'))}</p><button class="btn small" data-a="syncOura" hidden${ouraSyncing?' disabled':''}>Sync now</button></div>`;
 }
 
 /* daily call */
@@ -1843,44 +1844,8 @@ function coachStats(){
   return L.join('\n');
 }
 function recentCalls(n){return Object.entries(S.coach).filter(([d])=>d<today()).sort((a,b)=>b[0].localeCompare(a[0])).slice(0,n)}
-async function genDaily(manual){
-  if(!AI||dailyBusy)return;
-  const t=today();dailyBusy=true;dailyErr='';schedule();
-  const prev=recentCalls(6).map(([d,c])=>`${d}: [${c.status}] ${c.headline} — ${c.message}`).join('\n')||'none yet';
-  const st=S.settings;
-  const prompt=`You are ${S.settings.name||'your client'}'s personal strength and nutrition coach. You give him ONE call per day, read on his phone first thing. Today is ${t} (${parseYmd(t).toLocaleDateString('en-GB',{weekday:'long'})}).
-About him: ${st.coachNotes}
-Goal: ${st.goalKg} kg by ${st.goalDate} while staying lean (recomposition / lean gain). Targets: ${st.kcal} kcal, ${st.protein} g protein, ${st.weekly} sessions a week.
-
-COMPUTED STATS (calculated exactly by the app; trust these numbers, don't redo the maths):
-${coachStats()}
-
-LAST 14 DAYS OF LOG:
-${summaryText(14,false).split('\n').slice(5).join('\n')}
-
-YOUR PREVIOUS CALLS (newest first):
-${prev}
-
-How to decide:
-- Pick the single most important thing for today. Priority order: pace toward the goal weight, protein, energy balance, training consistency and lift progress, recovery (sleep, HRV, readiness), supplements.
-- "on_track": nothing needs to change. Say "good job, keep going" in your own words and name one specific thing that's working, with its number.
-- "adjust": one concrete change with numbers he can act on today (e.g. "add about 300 kcal on training days: 150 g cooked rice at dinner").
-- "watch": an early warning that needs no action yet (e.g. HRV under baseline 3 nights running).
-- Don't flip-flop: don't change calorie targets on less than a week of evidence, and don't repeat yesterday's advice word for word. If a previous call asked for something, check in the log whether he did it and say so.
-- Weight moves day to day with water and food; judge on the 7-day averages only.
-- If a key piece of data is missing (no food logged yesterday, no weigh-in for days), the call can simply be to log it.
-- No medical advice. Direct and warm, like a coach texting. No emojis.
-Reply with only JSON: {"status":"on_track|adjust|watch","headline":"max 8 words","message":"1-3 short sentences","why":"one sentence citing the numbers behind the call","focus":"weight|nutrition|training|recovery|supplements"}`;
-  try{
-    const r=await AI.json(prompt,{modelTier:'quick',cache:false});
-    const status=['on_track','adjust','watch'].includes(r&&r.status)?r.status:'watch';
-    if(!r||!r.headline||!r.message)throw{code:'invalid_json'};
-    await put('coach',t,{status,headline:String(r.headline).slice(0,120),message:String(r.message).slice(0,600),why:String(r.why||'').slice(0,400),focus:String(r.focus||''),t:Date.now(),hadWeight:!!S.weights[t],hadOura:!!S.oura[t]});
-  }catch(e){dailyErr=aiErr(e)||'';}
-  dailyBusy=false;schedule();
-}
 function maybeDaily(){
-  if(dailyTried||dailyBusy||!AI||mode==='loading')return;
+  if(dailyTried||dailyBusy||mode==='loading')return;
   if(!COLS.every(c=>loaded[c]))return;
   if(ouraSyncing)return;
   if(S.coach[today()])return;
@@ -1894,7 +1859,7 @@ function stackConfirmed(){return !!S.settings.confirmed||calib().days>3}
 function firstSteps(){
   const st=S.settings,hasW=Object.keys(S.weights).length>0,linked=!!st.ouraSheetId||Object.values(S.workouts).some(w=>w.source==='fitbod-csv')||!!st.connectSkipped;
   const step=(done,n,t,sub,acts)=>`<li class="first-step${done?' is-done':''}"><span class="first-n">${done?'<svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>':n}</span><span class="first-t"><b>${t}</b><small>${sub}</small>${done?'':`<span class="first-a">${acts}</span>`}</span></li>`;
-  return `<div class="first"><p class="first-k">Your first drop · three things to set up</p><ol class="first-steps">
+  return `<div class="first"><p class="first-k">Getting started · three things to set up</p><ol class="first-steps">
     ${step(hasW,1,'Log your weight','In the To do list below, morning after the bathroom.',`<button class="btn small ink" data-a="goSec" data-k="weight">Weigh in</button>`)}
     ${step(!!st.confirmed,2,'Check your goal and targets',`${st.goalKg} kg by ${fmtShort(st.goalDate)} · ${st.kcal} kcal · ${st.protein} g protein · ${st.stack.length} supplements`,`<button class="btn small ink" data-a="confirmSetup">Looks right</button><button class="btn small ink" data-a="tab" data-t="setup">Change</button>`)}
     ${step(linked,3,'Connect your data','Oura sheet for recovery and classes, Fitbod CSV for lifting.',`<button class="btn small ink" data-a="tab" data-t="setup">Oura sheet</button><button class="btn small ink" data-a="openFitbod">Fitbod CSV</button><button class="btn small ink" data-a="skipConnect">Later</button>`)}
@@ -1907,7 +1872,6 @@ function dailyCard(){
     const dayN=Math.max(1,Math.min(cb.days,CAL_DAYS)),when=cb.firstCall&&cb.firstCall>t?fmtDay(cb.firstCall):null;
     return `<div class="rel"><span class="rel-tag">Call</span><span class="rel-note"><b>Day ${dayN} of ${CAL_DAYS}.</b> ${when?`Your first call lands ${when}`:'Your first call lands once the gaps below fill'}: ${Math.min(cb.wN,7)}/7 weigh-ins and ${Math.min(cb.fN,7)}/7 food days so far.</span></div>`;
   }
-  if(!AI)return c?callHTML(c):'';
   if(!c)return `<div class="rel"><span class="rel-tag">Call</span>${dailyBusy?`<span class="rel-note">${busy('Reading your numbers…')}</span>`:`<span class="rel-note">${esc(dailyErr||'Today’s call isn’t ready yet.')}</span><button class="btn small ink" data-a="genDaily">${dailyErr?'Try again':'Get it'}</button>`}</div>`;
   return callHTML(c);
 }
@@ -1921,7 +1885,7 @@ function callHTML(c){
   if(!callOpen)return `<div class="rel">${head}</div>`;
   return `<div class="rel open">${head}
     <p class="rel-msg">${esc(c.message)}</p>${c.why?`<p class="rel-why">${esc(c.why)}</p>`:''}
-    <div class="rel-act">${AI?'<button class="btn small ink" data-a="openChat">Ask your coach</button>':''}<button class="btn small ink" data-a="callHistory">Past calls</button>${AI&&stale&&!dailyBusy?`<button class="btn small ink" data-a="genDaily">Update with this morning’s numbers</button>`:''}${dailyBusy?`<span class="rel-why">${busy('Updating…')}</span>`:''}</div></div>`;
+    <div class="rel-act">${AI?'<button class="btn small ink" data-a="openChat">Ask your coach</button>':''}<button class="btn small ink" data-a="callHistory">Past calls</button>${stale&&!dailyBusy?`<button class="btn small ink" data-a="genDaily">Update with this morning’s numbers</button>`:''}${dailyBusy?`<span class="rel-why">${busy('Updating…')}</span>`:''}</div></div>`;
 }
 function openHistory(){
   const rows=Object.entries(S.coach).sort((a,b)=>b[0].localeCompare(a[0])).slice(0,30);
@@ -1987,37 +1951,6 @@ function freeSlots(d,minLen=75){ // 07:00–22:00, 20 min either side of anythin
 function usualGymHour(){const hs=Object.values(S.workouts).filter(w=>w.kind==='gym'&&w.t&&w.date>=addDays(today(),-60)).map(w=>new Date(w.t).getHours()).sort((a,b)=>a-b);return hs.length?hs[Math.floor(hs.length/2)]:null}
 const gymKey=()=>'gym-'+mondayOf(today());
 function gymPlanFor(d){const p=S.plans['gym-'+mondayOf(d)]||(d>=today()?S.plans[gymKey()]:null);return p&&Array.isArray(p.sessions)?p.sessions.filter(x=>x.date===d):[]}
-async function genGymPlan(){
-  if(!AI||gymBusy)return;gymBusy=true;gymErr='';render();const st=S.settings,t=today(),days=[...Array(7)].map((_,i)=>addDays(t,i));
-  const wkDone=[...Array(7)].map((_,i)=>addDays(mondayOf(t),i)).filter(d=>d<=t).flatMap(d=>workoutsOn(d).filter(w=>w.kind!=='walk').map(w=>`${d} ${(KINDS[w.kind]||KINDS.other).label}${w.focus?' '+w.focus:''}`));
-  const recent=[...Array(14)].map((_,i)=>addDays(t,-1-i)).reverse().map(d=>{const ws=workoutsOn(d).filter(w=>w.kind!=='walk');return ws.length?`${d}: ${ws.map(w=>(KINDS[w.kind]||KINDS.other).label+(w.focus?' '+w.focus:'')).join(' + ')}`:null}).filter(Boolean).join('\n');
-  const cal=days.map(d=>{const ev=calDay(d),fs=freeSlots(d);return `${d} (${DOW[(parseYmd(d).getDay()+6)%7]}): `+[
-    ...ev.filter(r=>r.kind).map(r=>`FIXED ${KINDS[r.kind].label} ${r.start}-${r.end} "${r.title}"`),
-    ...ev.filter(r=>!r.kind).map(r=>r.allDay?`all day "${r.title}"`:`busy ${r.start}-${r.end}`),
-    `free: ${fs.map(([a,b])=>hhmmOf(a)+'-'+hhmmOf(b)).join(', ')||'none'}`].join('; ')}).join('\n');
-  const rec=recoveryState(),uh=usualGymHour();
-  const prompt=`You are his strength coach. Schedule his GYM sessions for the next 7 days around his calendar.
-About him: ${st.coachNotes}
-Goal: lean gain to ${st.goalKg} kg. Weekly target: ${st.weekly} training sessions in total (gym + classes). Already done this week: ${wkDone.join('; ')||'nothing yet'}.
-Fixed classes in the calendar (Corehaus = Lagree, Lapso = spin, run = run) are already booked and count toward the target.
-Last 14 days of training:
-${recent||'none'}
-Lifts due (from his progression plan):
-${liftPlanText()}
-${rec?`HRV last 3 nights ${rec.now} vs normal ${rec.base} (${rec.pct}%).`:''}
-${uh!=null?`He usually lifts around ${uh}:00.`:''}
-Next 7 days (only use the free windows for gym; a session is 60-75 min):
-${cal}
-Rules: fill the weekly target with gym sessions on top of the fixed classes (usually 3-4 gym sessions a week); rotate his split (pick the focus most due: Push, Pull, Legs, Upper, Lower or Full); no heavy legs the day before a run, spin or Lagree class, and no two hard sessions within 12 h; prefer days without a class; pick times near his usual hour inside a free window; if recovery is low, make the next session lighter. Never schedule outside the free windows.
-Reply with only JSON: {"sessions":[{"date":"YYYY-MM-DD","start":"18:30","end":"19:40","focus":"Push","why":"short reason"}],"note":"one sentence on the week"}`;
-  const ctl=new AbortController(),timer=setTimeout(()=>ctl.abort(),90000);
-  try{const r=await AI.json(prompt,{modelTier:'quick',cache:false,signal:ctl.signal});
-    const ok=(r&&Array.isArray(r.sessions)?r.sessions:[]).filter(x=>isDate(x.date)&&days.includes(x.date)&&hm(x.start)!=null).slice(0,7)
-      .map(x=>({date:x.date,start:String(x.start).slice(0,5),end:String(x.end||'').slice(0,5),focus:String(x.focus||'Gym').slice(0,20),why:String(x.why||'').slice(0,160)}));
-    await put('plans',gymKey(),{made:Date.now(),sessions:ok,note:String(r&&r.note||'').slice(0,200)})}
-  catch(e){gymErr=e&&e.code==='cancelled'?'That took too long. Try again.':aiErr(e)||'Couldn’t plan the week. Try again.'}
-  clearTimeout(timer);gymBusy=false;render();
-}
 function weekCard(){
   const t=today(),c=calRows(),has=true,plan=S.plans[gymKey()],days=[...Array(7)].map((_,i)=>addDays(t,i));
   const rows=days.map(d=>{const ev=calDay(d),fx=ev.filter(r=>r.kind),gy=gymPlanFor(d),done=workoutsOn(d).filter(w=>w.kind!=='walk');
@@ -2025,11 +1958,106 @@ function weekCard(){
     const items=[...fx.map(r=>`<span class="wk-i"><i style="background:${KINDS[r.kind].c}"></i>${KINDS[r.kind].label} <small>${r.start}</small></span>`),
       ...gy.map(x=>`<span class="wk-i plan"><i style="background:${KINDS.gym.c}"></i>Gym · ${esc(x.focus)} <small>${esc(x.start)}</small></span>`)];
     return `<li class="wk-d${d===t?' now':''}"><b>${d===t?'Today':DOW[(parseYmd(d).getDay()+6)%7]+' '+parseYmd(d).getDate()}</b><div>${items.join('')||'<span class="wk-rest">Rest</span>'}${busyMin?`<small class="wk-b">${Math.round(busyMin/60*10)/10} h booked</small>`:''}</div></li>`}).join('');
-  return `<section class="card"><div class="card-h"><h2>This week</h2>${AI&&has?`<button class="btn small" data-a="genGym"${gymBusy?' disabled':''}>${plan?'Re-plan':'Plan gym'}</button>`:''}</div>
+  return `<section class="card"><div class="card-h"><h2>This week</h2>${has?`<button class="btn small" data-a="genGym"${gymBusy?' disabled':''}>${plan?'Re-plan':'Plan gym'}</button>`:''}</div>
     ${has?`<ul class="wk">${rows}</ul>
-      ${gymBusy?`<p class="note">${busy('Fitting your gym sessions around the calendar…')}</p>`:gymErr?`<p class="note err">${esc(gymErr)}</p>`:plan&&plan.note?`<p class="note">${esc(plan.note)}</p>`:!plan&&AI?'<p class="note">Tap Plan gym: it picks free slots around work and your classes, and which session to do in each.</p>':''}
+      ${gymBusy?`<p class="note">${busy('Fitting your gym sessions around the calendar…')}</p>`:gymErr?`<p class="note err">${esc(gymErr)}</p>`:plan&&plan.note?`<p class="note">${esc(plan.note)}</p>`:!plan?'<p class="note">Tap Plan gym: it picks free slots around work and your classes, and which session to do in each.</p>':''}
       <p class="note">${c.rows.length?`Calendar synced ${new Date(c.at).toLocaleString('en-GB',{weekday:'short',hour:'2-digit',minute:'2-digit'})}. Corehaus = Lagree, Lapso = Spin, Run = Run.`:'Using your work hours from Setup. Connect your calendar (calendar-sync script) to add your classes and other plans.'}</p>`
     :`<p class="empty">Connect your calendar and this shows your week: fixed classes, busy time, and the best slots for the gym with the session to do. Add <b>calendar-sync</b> to your Apps Script (one paste and one Run).</p>`}</section>`}
+
+/* ---------- rules: the daily call, session, meal and gym-week suggestions, computed here with no AI ---------- */
+const kgwk=v=>(v>=0?'+':'')+v.toFixed(2);
+function ruleCall(){
+  const st=S.settings,t=today(),y=addDays(t,-1),rng=(end,n)=>[...Array(n)].map((_,i)=>addDays(end,-i));
+  const C=[],add=(score,key,status,headline,message,why,focus)=>C.push({score,key,status,headline,message,why,focus});
+  // data gaps first: the other calls are only as good as the log
+  const lastW=Object.keys(S.weights).filter(isDate).sort().pop(),wGap=lastW?dayNum(t)-dayNum(lastW):99;
+  if(wGap>=3)add(92,'weigh','adjust','Weigh in tomorrow morning',`Your last weigh-in was ${wGap} days ago. One reading after the bathroom, before food, keeps the 7-day average honest.`,`Last weigh-in ${lastW?fmtShort(lastW):'never'}.`,'weight');
+  const fd=rng(y,7).filter(d=>dayTotals(d).kcal>=st.kcal*.5),ft=fd.map(dayTotals);
+  if(fd.length<4)add(90,'food','adjust','Log every meal today',`Only ${fd.length} of the last 7 days have a full food log, so the calorie and protein calls are guesswork. Log everything today, even the snacks.`,`${fd.length}/7 days logged.`,'nutrition');
+  // recovery
+  const rec=recoveryState(),o=S.oura[t]||{},rd=num(o.readiness),sh=num(o.sleepHours);
+  if(rec&&rec.low)add(82+(rd!=null&&rd<70?5:0),'hrv',rd!=null&&rd<70?'adjust':'watch',`HRV ${-rec.pct}% under your normal`,`Three-night HRV is ${rec.now} against your usual ${rec.base}. Keep today easy: same weights, one set fewer, or swap the session for a walk. Aim for 8 hours in bed tonight.`,`HRV ${rec.now} vs ${rec.base}${rd!=null?`, readiness ${rd}`:''}.`,'recovery');
+  else if(sh!=null&&sh<6.3)add(55,'sleep','watch','Short night: protect tonight',`You slept ${r1(sh)} h. Train as planned but skip anything maximal, and get to bed 30 minutes earlier tonight.`,`Last night ${r1(sh)} h${rd!=null?`, readiness ${rd}`:''}.`,'recovery');
+  // pace toward the goal (7-day averages only)
+  const w0=ma7(t),w14=ma7(addDays(t,-14)),wLeft=Math.max(1,(parseYmd(st.goalDate)-parseYmd(t))/6048e5);
+  if(w0!=null&&w14!=null&&fd.length>=4){
+    const rate=(w0-w14)/2,need=(st.goalKg-w0)/wLeft,e=tdeeEstimate(),tgt=e.ready?e.target:null;
+    if(rate>need+.15)add(72,'fast','adjust','Gaining a bit fast: trim 200 kcal',`Your 7-day average is moving ${kgwk(rate)} kg/wk against the ${kgwk(need)} you need, so some of it is fat. Take about 200 kcal off each day, easiest from fats: less oil and fewer nuts.${tgt?` Your logs point to ${tgt} kcal.`:''}`,`Pace ${kgwk(rate)} vs ${kgwk(need)} kg/wk.`,'weight');
+    else if(rate<need-.15)add(72,'slow','adjust','Behind pace: add 250 kcal',`Your 7-day average is moving ${kgwk(rate)} kg/wk but the goal needs ${kgwk(need)}. Add about 250 kcal a day, mostly carbs around training: 150 g cooked rice or two bananas.${tgt?` Your logs point to ${tgt} kcal.`:''}`,`Pace ${kgwk(rate)} vs ${kgwk(need)} kg/wk.`,'weight');
+    else add(10,'pace','on_track','Right on pace',`Your 7-day average is moving ${kgwk(rate)} kg/wk, right where the goal needs it (${kgwk(need)}). Keep the routine exactly as it is.`,`7-day avg ${w0.toFixed(1)} kg, pace ${kgwk(rate)} kg/wk.`,'weight');
+  }
+  // protein
+  if(fd.length>=3){const pA=Math.round(ft.reduce((a,x)=>a+x.p,0)/ft.length),hit=ft.filter(x=>x.p>=st.protein*.95).length;
+    if(pA<st.protein*.92||hit<=Math.floor(fd.length/2))add(62,'protein','adjust',`Protein short on ${fd.length-hit} of ${fd.length} days`,`You're averaging ${pA} g against ${st.protein} g. Add a whey scoop after training (+25 g) and 250 g Greek yogurt in the evening (+20 g).`,`Protein avg ${pA} g, target hit ${hit}/${fd.length} days.`,'nutrition');
+    else add(12,'protein_ok','on_track','Protein locked in',`You hit protein on ${hit} of ${fd.length} days, averaging ${pA} g. That's exactly what builds muscle on a recomp. Keep it up.`,`Protein avg ${pA} g.`,'nutrition')}
+  // training volume
+  const wk=rng(y,7).flatMap(workoutsOn).filter(w=>w.kind!=='walk').length,todayW=workoutsOn(t).filter(w=>w.kind!=='walk').length;
+  if(wk+todayW<st.weekly-2){const pl=gymPlanFor(t)[0];add(50,'train','adjust',`${wk} sessions in 7 days: get one in`,`You're at ${wk} of your ${st.weekly} weekly sessions. ${pl?`Your plan has ${pl.focus} at ${pl.start} today. Go for it.`:'Fit one in today, even 45 minutes counts.'}`,`${wk}/${st.weekly} sessions over the last 7 days.`,'training')}
+  // stalled lifts
+  const stalls=liftPlan().filter(l=>l.stall);
+  if(stalls.length)add(30+stalls.length*4,'stall','watch',`${stalls[0].name} has stalled`,`No new best in your last 3 sessions${stalls.length>1?` (and ${stalls.length-1} more lift${stalls.length>2?'s':''})`:''}. Next time drop 10% and build back up, or switch the rep range for 3 weeks.`,`${stalls.map(l=>l.name).join(', ')}.`,'training');
+  // don't say the same thing two days running unless it's urgent
+  const yc=S.coach[y];C.forEach(c=>{if(yc&&yc.key===c.key&&c.score<85)c.score-=15});
+  C.sort((a,b)=>b.score-a.score);
+  const top=C[0]||{key:'start',status:'watch',headline:'Keep logging',message:'Log your weight, meals and sessions for a few more days and the calls get specific.',why:'Not enough data yet.',focus:'weight'};
+  return top}
+async function genDaily(){const t=today(),c=ruleCall();
+  await put('coach',t,{status:c.status,key:c.key,headline:c.headline,message:c.message,why:c.why,focus:c.focus,t:Date.now(),hadWeight:!!S.weights[t],hadOura:!!S.oura[t],rule:true})}
+
+// session: the focus most due from his own split, his own lifts, next weights from the lift plan
+function ruleSession(skip=0){
+  const t=today(),rec=recoveryState(),low=!!(rec&&rec.low);
+  const gyms=Object.values(S.workouts).filter(w=>w.kind==='gym'&&(w.exercises||[]).some(e=>e.name)&&w.date>=addDays(t,-45)).sort((a,b)=>b.date.localeCompare(a.date));
+  if(!gyms.length)return null;
+  const fo=w=>w.focus||guessFocus((w.exercises||[]).map(e=>e.name))||'Full';
+  const last={};gyms.forEach(w=>{const f=fo(w);if(!last[f])last[f]=w.date});
+  const planned=gymPlanFor(t)[0];
+  const order=Object.keys(last).sort((a,b)=>last[a].localeCompare(last[b]));
+  if(planned&&last[planned.focus]){order.splice(order.indexOf(planned.focus),1);order.unshift(planned.focus)}
+  const focus=order[skip%order.length];
+  const cnt={},sets={};gyms.filter(w=>fo(w)===focus).slice(0,3).forEach(w=>(w.exercises||[]).forEach(e=>{if(!e.name||e.dist!=null)return;cnt[e.name]=(cnt[e.name]||0)+1;if(!sets[e.name])sets[e.name]=num(e.sets)||3}));
+  const plan=Object.fromEntries(liftPlan().map(l=>[l.name,l]));
+  let names=Object.keys(cnt).sort((a,b)=>cnt[b]-cnt[a]);const fw=FOCUS_WORDS[focus];if(fw){const m=names.filter(n=>fw.test(' '+n.toLowerCase()+' ')||(focus==='Legs'&&/romanian|rdl|stiff/i.test(n)));if(m.length>=2)names=m}
+  const q4=v=>v==null?null:Math.round(v*4)/4;
+  const ex=names.slice(0,6).map(n=>{const p=plan[n],n0=Math.max(2,Math.min(4,sets[n]||3))-(low?1:0);
+    const w=p?(low?p.top:p.next.w):null,r=p?(low?p.lo:p.next.r):10;
+    return {name:n,sets:[...Array(n0)].map(()=>({reps:r,kg:q4(w)})),rest:COMPOUND.test(n)?'2–3 min':'90 s',note:p?(low?'recovery is low: hold the weight':p.why):'match last time'}});
+  const ago=dayNum(t)-dayNum(last[focus]);
+  return {focus,mins:Math.min(75,ex.length*11+10),why:`${focus} was last trained ${ago} day${ago===1?'':'s'} ago${planned&&planned.focus===focus?', and it’s on today’s plan':''}${low?'. HRV is under your normal, so weights hold and one set comes off.':'.'}`,
+    warmup:'5 min easy bike or rower, then 2 light ramp-up sets of the first lift.',exercises:ex}}
+
+// meal: from meals he has logged, the one that best fills what's left of today
+function ruleMeal(skip=0){
+  const st=S.settings,t=today(),dt=dayTotals(t),remK=st.kcal-dt.kcal,remP=st.protein-dt.p,h=new Date().getHours();
+  const slot=h<11?'Breakfast':h<16?'Lunch':h<18?'Snack':'Dinner',eatenT=new Set(mealsOn(t).map(m=>(m.title||'').trim().toLowerCase()));
+  const seen={};Object.values(S.meals).sort((a,b)=>(b.date||'').localeCompare(a.date||'')).forEach(m=>{const k=(m.title||'').trim().toLowerCase();if(!k||seen[k]||!(m.items||[]).length)return;seen[k]=m});
+  const goalK=Math.max(250,Math.min(remK,slot==='Snack'?450:900)),goalP=Math.max(20,Math.min(remP,slot==='Snack'?30:60));
+  const c=Object.values(seen).map(m=>{const x=mealTotals(m);let s=Math.abs(x.kcal-goalK)/100+Math.abs(x.p-goalP)/8;
+    if(m.slot===slot)s-=1.5;if(eatenT.has((m.title||'').trim().toLowerCase()))s+=3;if(x.kcal>remK+150)s+=4;return {m,x,s}}).sort((a,b)=>a.s-b.s);
+  if(!c.length)return null;const {m,x}=c[skip%c.length];
+  return {title:m.title,slot,why:`${Math.round(x.p)} g protein and ${Math.round(x.kcal)} kcal. You have ${Math.max(0,Math.round(remP))} g protein and ${Math.max(0,Math.round(remK))} kcal left today.`,
+    items:(m.items||[]).map(i=>({name:i.name,amount:i.amount||'',kcal:num(i.kcal),protein:num(i.protein),carbs:num(i.carbs),fat:num(i.fat)})),steps:[],count:c.length}}
+
+// gym week: slots near his usual hour, split rotated, legs never the day before a class or run
+async function genGymPlan(){
+  const st=S.settings,t=today(),days=[...Array(7)].map((_,i)=>addDays(t,i)),uh=(usualGymHour()??18)*60;
+  const classes=days.flatMap(d=>calDay(d).filter(r=>r.kind&&r.kind!=='gym'));
+  const want=Math.max(2,Math.min(4,st.weekly-classes.length));
+  const gyms=Object.values(S.workouts).filter(w=>w.kind==='gym'&&w.date>=addDays(t,-30)).sort((a,b)=>a.date.localeCompare(b.date));
+  const fo=w=>w.focus||guessFocus((w.exercises||[]).map(e=>e.name))||'Full';
+  const split=[...new Set(gyms.map(fo))];if(!split.length)split.push('Upper','Lower');
+  const lastF={};gyms.forEach(w=>lastF[fo(w)]=w.date);
+  const queue=[...split].sort((a,b)=>(lastF[a]||'').localeCompare(lastF[b]||''));
+  const cand=days.map(d=>{const fs=freeSlots(d,75),hasClass=calDay(d).some(r=>r.kind&&r.kind!=='gym'),done=workoutsOn(d).some(w=>w.kind==='gym');
+    if(!fs.length||done)return null;let best=null;fs.forEach(([a,b])=>{const s=Math.max(a,Math.min(uh,b-70));if(!best||Math.abs(s-uh)<Math.abs(best-uh))best=s});
+    return {d,start:best,hasClass}}).filter(Boolean);
+  const pick=[];for(const pass of [0,1])for(const c of cand){if(pick.length>=want)break;if(pick.includes(c))continue;if(pass===0&&c.hasClass)continue;
+    if(pick.some(p=>Math.abs(dayNum(p.d)-dayNum(c.d))<2)&&pass===0)continue;pick.push(c)}
+  pick.sort((a,b)=>a.d.localeCompare(b.d));
+  const sessions=pick.map(p=>{const next=addDays(p.d,1),hard=calDay(next).some(r=>['lagree','spin','run','barrys'].includes(r.kind));
+    let i=queue.findIndex(f=>!(hard&&/leg|lower/i.test(f)));if(i<0)i=0;const f=queue.splice(i,1)[0];queue.push(f);
+    const s=Math.round(p.start/5)*5;return {date:p.d,start:hhmmOf(s),end:hhmmOf(s+70),focus:f,why:`${f} is most due${hard&&!/leg|lower/i.test(f)?'; legs stay off the day before your class':''}.`}});
+  await put('plans',gymKey(),{made:Date.now(),sessions,note:`${sessions.length} gym + ${classes.length} class${classes.length===1?'':'es'} = ${sessions.length+classes.length} sessions this week (target ${st.weekly}).`,rule:true})}
 
 /* ---------- weekly plan: 7 days of meals + a Mercadona list ---------- */
 const DOW=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];let planBusy=false,planErr='',planTab='days';
@@ -2112,46 +2140,12 @@ function favMealsText(){
   const cnt={};Object.values(S.meals).forEach(m=>{const k=(m.title||'').trim();if(k)cnt[k]=(cnt[k]||0)+1});
   return Object.entries(cnt).sort((a,b)=>b[1]-a[1]).slice(0,12).map(([k,n])=>`${k} (${n}x)`).join(', ')||'none yet';
 }
-function openSuggest(kind){
-  const meal=kind==='meal';
-  openSheet(head(meal?'Suggest a meal':'Suggest a session')+`
-    <label>${meal?'Anything specific? (optional)':'Anything specific? (optional)'}<input id="sgAsk" placeholder="${meal?'e.g. quick, post-workout, from Mercadona, no cooking':'e.g. 45 min, upper body, go easy on the lower back'}"></label>
-    <div class="actions"><button class="btn primary" data-a="runSuggest" data-k="${kind}">${meal?'Suggest a meal':'Build my session'}</button></div>
-    <div id="sgOut" aria-live="polite"></div>`);
-}
-async function runSuggest(kind){
-  if(!AI)return;const out=$('#sgOut'),ask=($('#sgAsk')||{}).value||'';const st=S.settings,t=today(),o=S.oura[t];
-  const go=document.querySelector('[data-a=runSuggest]');if(go)go.disabled=true;
-  out.innerHTML=`<p class="note">${busy(kind==='meal'?'Planning a meal around today’s numbers…':'Reading your lifts and recovery…')}</p>`;
-  const common=`About him: ${st.coachNotes}
-Goal: ${st.goalKg} kg by ${st.goalDate}, lean gain. Daily targets ${st.kcal} kcal, ${st.protein} g protein, ${st.carbs} g carbs, ${st.fat} g fat. Lives in Barcelona (Mercadona, Spanish/European portions).
-STATS (exact, computed by the app):
-${coachStats()}
-Last night (Oura): ${o?ouraBrief(o):'no data'}.
-Training today so far: ${workoutsOn(t).map(w=>sessBrief(w)).join('; ')||'none'}.${gymPlanFor(t).length?` His week plan has ${gymPlanFor(t).map(x=>x.focus+' at '+x.start).join(', ')} today: build that focus unless his request says otherwise.`:''}${calDay(t).filter(r=>r.kind).length?` Classes today: ${calDay(t).filter(r=>r.kind).map(r=>KINDS[r.kind].label+' at '+r.start).join(', ')}.`:''}
-His request: """${ask||'(nothing specific)'}"""`;
-  const prompt=kind==='meal'?`You are his nutrition coach. Suggest ONE meal for ${new Date().getHours()<11?'breakfast':new Date().getHours()<16?'lunch':new Date().getHours()<18?'an afternoon snack':'dinner'} now that fits what's left of today's targets (prioritise protein; on a training day lean on carbs around the session).
-${common}
-${foodTodayText(t)}
-Meals he eats often: ${favMealsText()}.
-Use real, easy-to-buy foods with exact amounts in grams. Be realistic with kcal (count oil). Reply with only JSON:
-{"title":"short name","why":"one sentence tying it to today's numbers","items":[{"name":"Chicken breast, grilled","amount":"200 g","kcal":330,"protein":62,"carbs":0,"fat":7}],"steps":["short step"],"mins":15}`
-  :`You are his strength coach. Build TODAY's gym session for him with exact sets, reps and weights.
-${common}
-Recent gym sessions (newest first; [weight×reps per set]):
-${gymHistoryText()}
-Best recent numbers per lift:
-${liftBestsText()}
-The app's progression plan (double progression; use these exact next weights and reps for any lift you include, unless recovery says deload):
-${liftPlanText()}
-Rules: pick the focus that is most due given his recent split and days since each muscle group; use exercises he actually does (same names) unless the request says otherwise; progress sensibly from his last numbers (small load or rep increase when last session hit its reps; hold or back off if readiness/HRV is below his usual or he trained the same muscles within 48 h); he trains solo on Smith machine for bench and squat; respect the lower-back note (no heavy conventional deadlifts unless he asks). 5-7 exercises, 45-70 minutes. Reply with only JSON:
-{"focus":"Push","why":"one sentence citing his numbers","mins":60,"warmup":"one line","exercises":[{"name":"Smith Machine Bench Press","sets":[{"reps":8,"kg":72.5},{"reps":8,"kg":72.5},{"reps":8,"kg":72.5}],"rest":"2-3 min","note":"short cue or why"}],"finisher":"optional one line"}`;
-  try{
-    const r=await AI.json(prompt,{modelTier:'quick',cache:false});
-    lastSuggest={kind,r};out.innerHTML=kind==='meal'?mealSuggestHTML(r):sessionSuggestHTML(r);
-  }catch(e){out.innerHTML=`<p class="note err">${esc(aiErr(e)||'Couldn’t build a suggestion. Try again.')}</p>`}
-  if(go)go.disabled=false;
-}
+let sgSkip=0;
+function openSuggest(kind){sgSkip=0;openSheet(head(kind==='meal'?'Suggest a meal':'Today’s session')+`<div id="sgOut" aria-live="polite"></div>`);runSuggest(kind,0)}
+function runSuggest(kind,skip){if(skip==null)skip=++sgSkip;const out=$('#sgOut');if(!out)return;
+  const r=kind==='meal'?ruleMeal(skip):ruleSession(skip);
+  if(!r){out.innerHTML=`<p class="empty">${kind==='meal'?'Log a few meals first: suggestions come from meals you’ve eaten before.':'Import or log a few gym sessions first: suggestions come from your own lifts.'}</p>`;return}
+  lastSuggest={kind,r};out.innerHTML=kind==='meal'?mealSuggestHTML(r):sessionSuggestHTML(r)}
 function mealSuggestHTML(r){
   const items=(r&&Array.isArray(r.items)?r.items:[]);const x=items.reduce((a,i)=>({k:a.k+(num(i.kcal)||0),p:a.p+(num(i.protein)||0),c:a.c+(num(i.carbs)||0),f:a.f+(num(i.fat)||0)}),{k:0,p:0,c:0,f:0});
   if(!items.length)return '<p class="note err">Claude didn’t return a meal. Try again.</p>';
@@ -2250,7 +2244,7 @@ const A={
   planLog:b=>planLog(b.dataset.w,b.dataset.sl,+b.dataset.i),
   shopTick:async b=>{const p=S.plans[b.dataset.w];if(!p)return;const got={...(p.got||{})},i=b.dataset.i;if(got[i])delete got[i];else got[i]=true;await safe(()=>put('plans',b.dataset.w,{...clean(p),got}));openPlan('shop')},
   shopCopy:b=>{const p=S.plans[b.dataset.w];if(p)copyText(shopText(p))},
-  genGym:()=>genGymPlan(),
+  genGym:async()=>{await genGymPlan();toast('Gym sessions planned')},
   labNew:()=>openLabNew(),labSave:()=>labSave(),labDel:b=>deleteWith('exp',b.dataset.id,'Experiment deleted'),
   labTick:async b=>{const x=S.exp[b.dataset.id];if(!x)return;const days={...(x.days||{})};if(days[sel])delete days[sel];else days[sel]=true;await safe(()=>put('exp',b.dataset.id,{...clean(x),days}))},
   planAll:()=>{planAll=true;render()},
