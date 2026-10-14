@@ -1056,8 +1056,8 @@ function sceneSVG(ph){const P=PHASES[ph];let stars='';
   <path d="M0 290 C60 262 110 270 160 282 S260 300 310 276 S380 262 400 270 V420 H0Z" fill="${P.mid}"/>
   <path d="M0 330 C70 306 140 318 200 326 S320 340 400 312 V420 H0Z" fill="${P.near}"/></svg>`}
 function scoreState(v){return v==null?null:v>=85?['Optimal','var(--good)']:v>=70?['Good','var(--ok)']:['Pay attention','var(--warn)']}
-function ringHTML(label,v,p){const st=scoreState(v),C=2*Math.PI*30,off=v==null?C:C*(1-Math.min(100,v)/100);
-  return `<button class="ring" data-a="goProg" data-p="${p}" style="--rc:${st?st[1]:'var(--muted)'};--c:${C.toFixed(1)}"><span class="ring-in"><svg viewBox="0 0 68 68" aria-hidden="true"><circle class="rt" cx="34" cy="34" r="30"/><circle class="rv" cx="34" cy="34" r="30" stroke-dasharray="${C.toFixed(1)}" stroke-dashoffset="${off.toFixed(1)}"/></svg><b>${v??'–'}</b></span><span class="ring-l">${label}</span><span class="ring-s">${st?st[0]:'No data'}</span></button>`}
+function ringHTML(label,v,p,wait){const st=scoreState(v),C=2*Math.PI*30,off=v==null?C:C*(1-Math.min(100,v)/100);
+  return `<button class="ring" data-a="goProg" data-p="${p}" style="--rc:${st?st[1]:'var(--muted)'};--c:${C.toFixed(1)}"><span class="ring-in"><svg viewBox="0 0 68 68" aria-hidden="true"><circle class="rt" cx="34" cy="34" r="30"/><circle class="rv" cx="34" cy="34" r="30" stroke-dasharray="${C.toFixed(1)}" stroke-dashoffset="${off.toFixed(1)}"/></svg><b>${v??'–'}</b></span><span class="ring-l">${label}</span><span class="ring-s">${st?st[0]:wait?'Waiting for ring':'No data'}</span></button>`}
 function dropBlock(d){
   const st=S.settings,t=today(),o=S.oura[d]||{},ph=phaseNow(),rd=num(o.readiness),s=scoreState(rd);
   const h=new Date().getHours(),hi=h<5?'Still up':h<12?'Good morning':h<18?'Good afternoon':'Good evening';
@@ -1067,7 +1067,7 @@ function dropBlock(d){
     <div class="scene">${sceneSVG(ph)}<i class="tint" style="background:${tint}"></i></div>
     <p class="hero-date">${parseYmd(d).toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long'})} · ${st.goalKg} kg in ${wk} weeks</p>
     ${d===t?`<h2 class="hero-hi">${hi}${st.name?`, <em>${esc(st.name)}</em>`:''}</h2>`:`<h2 class="hero-hi">${(()=>{const n=dayNum(t)-dayNum(d);return n===1?'Yesterday':n<7?n+' days ago':parseYmd(d).toLocaleDateString('en-GB',{weekday:'long'})})()}</h2>`}
-    <div class="rings">${ringHTML('Readiness',rd,'recovery')}${ringHTML('Sleep',num(o.sleepScore),'recovery')}${ringHTML('Activity',num(o.activityScore),'training')}</div>
+    <div class="rings">${ringHTML('Readiness',rd,'recovery',d===t)}${ringHTML('Sleep',num(o.sleepScore),'recovery',d===t)}${ringHTML('Activity',num(o.activityScore),'training',d===t)}</div>
     ${d===t?dailyCard():''}
   </section>`;
 }
@@ -2359,7 +2359,7 @@ document.addEventListener('change',e=>{
 setInterval(()=>{const t=today();if(t!==render._day){if(render._day&&sel===render._day)sel=t;render._day=t;dailyTried=false;dailyErr='';callOpen=null;schedule()}},60000);render._day=today();
 
 let autoSynced=false;
-function maybeAutoSync(){if(autoSynced||mode!=='db'&&mode!=='local'&&mode!=='gas')return;if(!S.settings.ouraSheetId)return;autoSynced=true;const l=lastOuraSync();if(!l||Date.now()-l.at>2*36e5)syncOuraSheet(false)}
+function maybeAutoSync(){if(autoSynced||mode!=='db'&&mode!=='local'&&mode!=='gas')return;if(!S.settings.ouraSheetId)return;autoSynced=true;const l=lastOuraSync();if(!l||Date.now()-l.at>36e5)syncOuraSheet(false)}
 const _render=render;render=function(){_render();if(mode!=='loading'){setTimeout(maybeAutoSync,0);setTimeout(maybeDaily,50)}};
 render();initStore();initAI();initAssets();
 </script>
