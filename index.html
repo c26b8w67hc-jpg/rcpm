@@ -426,6 +426,13 @@ th{font:400 12px/1.2 var(--f);color:var(--muted);border-top:0}
 .ov-l,.ov-r{position:absolute;top:10px;padding:4px 8px;border-radius:999px;background:rgba(11,13,23,.6);font:500 12px/1 var(--f)}.ov-l{left:10px}.ov-r{right:10px}
 #ovR{padding:0;min-height:32px;border:0;background:none;accent-color:var(--ink)}
 .review .note b{color:var(--ink)}
+.rv-score{margin:0 0 4px;color:var(--muted);font-size:13px}.rv-score b{font-size:32px;color:var(--ink);margin-right:2px}
+.rv-verdict{margin:0 0 12px;font-size:15px;line-height:1.5}
+.rv-h{margin:16px 0 6px;font:500 13px/1.2 var(--f);color:var(--muted)}.rv-p{margin:0;font-size:14px;line-height:1.5}
+.rv-l{margin:0;padding-left:18px;font-size:14px;line-height:1.5}.rv-l li{margin:3px 0}.rv-l.good li::marker{color:var(--good)}.rv-l.bad li::marker{color:var(--warn)}
+.fx{margin:0;padding:0;list-style:none;counter-reset:fx}.fx li{position:relative;padding:10px 0 10px 34px;border-top:1px solid var(--line);counter-increment:fx}
+.fx li::before{content:counter(fx);position:absolute;left:0;top:10px;width:22px;height:22px;border-radius:50%;background:var(--hot);color:var(--on);font:600 12px/22px var(--f);text-align:center}
+.fx b{display:block;font-weight:500}.fx small{font-size:13px;color:var(--muted)}
 .again-h{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px}.again-h .lab{margin:0}
 .pills{display:flex;gap:2px;padding:3px;border-radius:999px;background:var(--empty)}
 .pills button{border:0;background:none;color:var(--muted);font:500 13px/1 var(--f);padding:8px 12px;border-radius:999px;min-height:32px}
@@ -556,16 +563,16 @@ const KINDS={
   spin:{label:'Spin',c:'var(--violet)'},barrys:{label:"Barry's",c:'var(--crimson)'},walk:{label:'Walk',c:'var(--stone)'},other:{label:'Other',c:'var(--muted)'}
 };
 const SLOTS=['Breakfast','Lunch','Dinner','Snack','Pre-workout','Post-workout'];
-const DEFAULTS={heightCm:190,kcal:3000,protein:165,carbs:380,fat:90,goalKg:85,goalDate:'2027-04-30',name:'',weekly:6,workStart:'09:00',workEnd:'18:00',ouraSheetId:'',
+const DEFAULTS={heightCm:190,kcal:3000,protein:165,carbs:380,fat:90,goalKg:85,goalDate:'2027-04-30',name:'',weekly:6,gymMin:4,goalLook:'lean and athletic: broad shoulders, full upper chest, visible arms, visible abs',workStart:'09:00',workEnd:'18:00',ouraSheetId:'',
   coachNotes:'',
   stack:[{name:'Creatine',dose:'5 g',when:'Any time'},{name:'Whey protein',dose:'1–2 scoops',when:'Breakfast'},{name:'Vitamin D3 + K2',dose:'4000 IU',when:'Morning'},{name:'Vitamin C',dose:'',when:'Morning'},
     {name:'Omega-3',dose:'',when:'With food'},{name:'Zinc',dose:'',when:'Evening'},{name:'Ashwagandha KSM-66',dose:'',when:'Evening'},
     {name:'L-theanine',dose:'',when:'Evening'},{name:'Magnesium glycinate',dose:'400 mg',when:'Before bed'}]};
 
 /* ---------- store ---------- */
-const COLS=['weights','workouts','meals','supps','oura','coach','body','exp','plans'];
+const COLS=['weights','workouts','meals','supps','oura','coach','body','exp','plans','reviews'];
 const loaded={};
-const S={settings:clean(DEFAULTS),weights:{},workouts:{},meals:{},supps:{},oura:{},coach:{},body:{},exp:{},plans:{}};
+const S={settings:clean(DEFAULTS),weights:{},workouts:{},meals:{},supps:{},oura:{},coach:{},body:{},exp:{},plans:{},reviews:{}};
 let root=null,mode='loading';
 const LSKEY='recomplog.v1';
 function loadLocal(){try{const j=JSON.parse(localStorage.getItem(LSKEY)||'null');if(j){for(const c of COLS)S[c]=j[c]||{};S.settings={...clean(DEFAULTS),...(j.settings||{})}}}catch(e){}}
@@ -1181,7 +1188,7 @@ progress(){
     ({weight:VIEWS.body,training:VIEWS.train,food:VIEWS.food,recovery:VIEWS.recovery,lab:VIEWS_LAB}[prog]||VIEWS.body)();
 },
 today(){
-  return dropBlock(sel)+(!hasClaude()&&!useGas()?`<section class="nudge"><div class="nudge-t"><b>Connect your data</b><small>This copy of RCMP isn’t linked to your Google backend yet, so it only saves on this device.</small></div><div class="nudge-a"><button class="btn small primary" data-a="tab" data-t="setup">Connect</button></div></section>`:'')+(sel===today()?staleAlarm()+weekReview()+fitbodNudge():'')+todoList(sel)+tileWall()+logCard(sel);
+  return dropBlock(sel)+(!hasClaude()&&!useGas()?`<section class="nudge"><div class="nudge-t"><b>Connect your data</b><small>This copy of RCMP isn’t linked to your Google backend yet, so it only saves on this device.</small></div><div class="nudge-a"><button class="btn small primary" data-a="tab" data-t="setup">Connect</button></div></section>`:'')+(sel===today()?staleAlarm()+reviewCard()+weekReview()+fitbodNudge():'')+todoList(sel)+tileWall()+logCard(sel);
 },
 train(){
   const t=today(),mon=mondayOf(t);
@@ -1306,6 +1313,8 @@ setup(){
   <section class="card"><div class="card-h"><h2>Goal</h2></div>
     <div class="g2">${f('goalKg','Goal weight (kg)')}${f('goalDate','By','date')}${f('weekly','Sessions per week')}</div>
     <div class="g2">${f('workStart','Work starts (Mon–Fri)','time')}${f('workEnd','Work ends','time')}</div>
+    <div class="g2">${f('gymMin','Gym days per week (minimum)')}</div>
+    <label style="margin-top:8px">The look you’re aiming for (the Sunday review judges against this)<textarea id="set_goalLook" data-sk="goalLook" style="min-height:64px">${esc(s.goalLook||'')}</textarea></label>
     <label style="margin-top:8px">Notes for the coach read-out<textarea id="set_coachNotes" data-sk="coachNotes">${esc(s.coachNotes)}</textarea></label></section>
   <section class="card"><div class="card-h"><h2>Oura auto-sync</h2></div>
     <label>Google Sheet ID or link<input id="set_ouraSheetId" data-sk="ouraSheetId" value="${esc(s.ouraSheetId)}" placeholder="Paste the sheet's link"></label>
@@ -1986,7 +1995,8 @@ Goal: ${st.goalKg} kg by ${st.goalDate}, lean gain (recomp). Lives in Barcelona 
 STATS (exact, computed by the app):
 ${coachStats()}
 Real burn from logs: ${e.ready?`eats ${e.intake} kcal/day, scale ${e.rateWk.toFixed(2)} kg/wk, so burns about ${e.tdee} kcal/day; app suggests ${e.target} kcal for the goal pace`:'not enough fully logged days yet'}.
-Lift plan (next session per lift):
+${latestReview()?`This week's focus from his Sunday review: ${(latestReview().r.focus||[]).map(f=>f.title+(f.target?' ('+f.target+')':'')).join('; ')}.
+`:''}Lift plan (next session per lift):
 ${liftPlanText()}
 Today: ${o?'Oura '+ouraBrief(o):'no Oura yet'}. ${foodTodayText(t)}
 LAST 30 DAYS IN DETAIL:
@@ -2115,7 +2125,7 @@ function ruleMeal(skip=0){
 async function genGymPlan(){
   const st=S.settings,t=today(),days=[...Array(7)].map((_,i)=>addDays(t,i)),uh=(usualGymHour()??18)*60;
   const classes=days.flatMap(d=>calDay(d).filter(r=>r.kind&&r.kind!=='gym'));
-  const want=Math.max(2,Math.min(4,st.weekly-classes.length));
+  const want=Math.max(st.gymMin||4,Math.min(5,st.weekly-classes.length));
   const gyms=Object.values(S.workouts).filter(w=>w.kind==='gym'&&w.date>=addDays(t,-30)).sort((a,b)=>a.date.localeCompare(b.date));
   const fo=w=>w.focus||guessFocus((w.exercises||[]).map(e=>e.name))||'Full';
   const split=[...new Set(gyms.map(fo))];if(!split.length)split.push('Upper','Lower');
@@ -2171,7 +2181,24 @@ function dayTargets(d){const st=S.settings,base={kcal:st.kcal,protein:st.protein
   return {kcal:st.kcal+dc*4,protein:st.protein,carbs:Math.max(100,st.carbs+dc),fat:st.fat,type:tr?'train':'rest',delta:dc}}
 
 /* ---------- Sunday review: the week in numbers and the one thing to fix ---------- */
-function weekReview(){const t=today(),wd=parseYmd(t).getDay();if(wd!==0&&wd!==1)return '';
+/* ---------- Sunday deep review (written by app-api.gs each Sunday) and the week's focus ---------- */
+const latestReview=()=>{const k=Object.keys(S.reviews||{}).filter(isDate).sort().pop();return k&&dayNum(today())-dayNum(k)<=8?{k,r:S.reviews[k]}:null};
+function reviewHTML(r,full){const li=a=>(a||[]).map(x=>`<li>${esc(x)}</li>`).join('');
+  return `${r.score?`<p class="rv-score"><b class="num">${esc(r.score)}</b>/10 this week</p>`:''}<p class="rv-verdict">${esc(r.verdict)}</p>
+    ${focusList(r)}
+    ${full?`${(r.wins||[]).length?`<h3 class="rv-h">What worked</h3><ul class="rv-l good">${li(r.wins)}</ul>`:''}${(r.problems||[]).length?`<h3 class="rv-h">What to fix</h3><ul class="rv-l bad">${li(r.problems)}</ul>`:''}
+    ${r.photos?`<h3 class="rv-h">Photos</h3><p class="rv-p">${esc(r.photos)}</p>`:''}${r.training?`<h3 class="rv-h">Training</h3><p class="rv-p">${esc(r.training)}</p>`:''}${r.nutrition?`<h3 class="rv-h">Nutrition</h3><p class="rv-p">${esc(r.nutrition)}</p>`:''}
+    ${r.lastFocus?`<p class="note">${esc(r.lastFocus)}</p>`:''}`:''}`}
+const focusList=r=>(r.focus||[]).length?`<ol class="fx">${r.focus.map(f=>`<li><b>${esc(f.title)}</b>${f.target?`<small>${esc(f.target)}</small>`:''}</li>`).join('')}</ol>`:'';
+function reviewCard(){const L=latestReview();if(!L)return '';const wd=parseYmd(today()).getDay(),fresh=dayNum(today())-dayNum(L.k)<=1&&(wd===0||wd===1);
+  if(fresh)return `<section class="card review"><div class="card-h"><h2>${esc(L.r.headline)}</h2><span class="aside">Sunday review</span></div>${reviewHTML(L.r,true)}<div class="actions"><button class="btn small ghost" data-a="openReviews">Past reviews</button></div></section>`;
+  return (L.r.focus||[]).length?`<section class="card focus"><div class="card-h"><h2>This week’s focus</h2><button class="btn small ghost" data-a="openReviews">Review</button></div>${focusList(L.r)}</section>`:''}
+function openReviews(){const ks=Object.keys(S.reviews||{}).filter(isDate).sort().reverse();
+  openSheet(head('Weekly reviews')+(useGas()?`<div class="actions" style="margin:0 0 12px"><button class="btn" data-a="runReview" id="rvGo">Run this week’s review now</button></div><p class="note" id="rvMsg" style="margin:-4px 0 10px"></p>`:'')+
+    (ks.length?ks.map((k,i)=>`<details class="more"${i===0?' open':''}><summary>${fmtDay(k)} · ${esc(S.reviews[k].headline)}</summary>${reviewHTML(S.reviews[k],true)}</details>`).join(''):'<p class="empty">The first review arrives Sunday evening. It reads your week and your newest photos, then sets up to 3 things to focus on.</p>'))}
+async function runReview(){const b=$('#rvGo'),m=$('#rvMsg');if(b){b.disabled=true;b.innerHTML=busy('Reading your week and photos… about a minute')}
+  try{const r=await gas('review');S.reviews[r.review.week]=r.review;dataVer++;saveLocal();openReviews();toast('Review ready')}catch(e){if(m)m.textContent=aiErr(e)||e.message||'The review failed. Try again.';if(b){b.disabled=false;b.textContent='Run this week’s review now'}}}
+function weekReview(){if(latestReview()&&dayNum(today())-dayNum(latestReview().k)<=1)return '';const t=today(),wd=parseYmd(t).getDay();if(wd!==0&&wd!==1)return '';
   const end=wd===0?t:addDays(t,-1),start=addDays(end,-6),days=[...Array(7)].map((_,i)=>addDays(start,i)),prev=days.map(d=>addDays(d,-7)),st=S.settings;
   const k=localStorage.getItem('rcmp.reviewSeen');if(k===end+':x')return '';
   const w1=ma7(end),w0=ma7(addDays(end,-7)),dw=w1!=null&&w0!=null?w1-w0:null;
@@ -2411,6 +2438,7 @@ const A={
   reviewHide:b=>{try{localStorage.setItem('rcmp.reviewSeen',b.dataset.k+':x')}catch(e){}render()},
   flagT:async b=>{const k=b.dataset.k,cur=clean(S.supps[sel]||{}),flags={...(cur.flags||{})};if(flags[k])delete flags[k];else flags[k]=true;await safe(()=>put('supps',sel,{...cur,flags}))},
   carbCycle:async()=>{await safe(()=>saveSettings({...S.settings,carbCycle:S.settings.carbCycle===false}),S.settings.carbCycle===false?'Carb cycling on':'Carb cycling off');setDraft=null;render()},
+  openReviews:()=>openReviews(),runReview:()=>runReview(),
   readdMeal:async b=>{const m=S.meals[b.dataset.id];if(!m)return;const h=new Date().getHours();const d=mealDraft?mealDraft.date:sel,id=newId();if(await safe(()=>put('meals',id,{...clean(m),date:d,slot:d===today()?(h<11?'Breakfast':h<16?'Lunch':h<18?'Snack':'Dinner'):m.slot,t:Date.now()}))){if(mealDraft)closeSheet();toast(`Added ${m.title||'meal'}`,()=>safe(()=>del('meals',id)))}},
   openOura:()=>openOura(),readOura:()=>readOura(),
   openFitbod:()=>openFitbod(),fbLater:()=>{try{localStorage.setItem(FBN_KEY,addDays(today(),3))}catch(e){}render()},fbImport:()=>fbImport(),
@@ -2421,7 +2449,7 @@ const A={
   addSupp:()=>{setDraft.stack.push({name:'',dose:'',when:''});suppEdit=setDraft.stack.length-1;render();const i=document.getElementById('sn'+(setDraft.stack.length-1));if(i)i.focus()},
   rmSupp:b=>{setDraft.stack.splice(+b.dataset.i,1);suppEdit=-1;render()},
   apiSave:()=>apiSave(),
-  saveSet:async()=>{const s=clean(setDraft);['kcal','protein','carbs','fat','goalKg','weekly'].forEach(k=>{const v=num(s[k]);s[k]=v==null?DEFAULTS[k]:v});if(!isDate(s.goalDate))s.goalDate=DEFAULTS.goalDate;['workStart','workEnd'].forEach(k=>{if(s[k]&&hm(s[k])==null)s[k]=DEFAULTS[k]});if(String(setDraft.ouraSheetId||'').trim()&&!sheetIdFrom(setDraft.ouraSheetId)){toast('That doesn’t look like a Google Sheet link or ID. Paste the full link from the sheet’s address bar.');return}s.ouraSheetId=sheetIdFrom(s.ouraSheetId);s.confirmed=true;s.stack=s.stack.filter(x=>x.name&&x.name.trim()).map(x=>({name:x.name.trim(),dose:(x.dose||'').trim(),when:(x.when||'').trim()}));
+  saveSet:async()=>{const s=clean(setDraft);['kcal','protein','carbs','fat','goalKg','weekly','gymMin'].forEach(k=>{const v=num(s[k]);s[k]=v==null?DEFAULTS[k]:v});if(!isDate(s.goalDate))s.goalDate=DEFAULTS.goalDate;['workStart','workEnd'].forEach(k=>{if(s[k]&&hm(s[k])==null)s[k]=DEFAULTS[k]});if(String(setDraft.ouraSheetId||'').trim()&&!sheetIdFrom(setDraft.ouraSheetId)){toast('That doesn’t look like a Google Sheet link or ID. Paste the full link from the sheet’s address bar.');return}s.ouraSheetId=sheetIdFrom(s.ouraSheetId);s.confirmed=true;s.stack=s.stack.filter(x=>x.name&&x.name.trim()).map(x=>({name:x.name.trim(),dose:(x.dose||'').trim(),when:(x.when||'').trim()}));
     const newSheet=s.ouraSheetId&&s.ouraSheetId!==S.settings.ouraSheetId;
     if(await safe(()=>saveSettings(s),'Setup saved')){setDraft=clean(S.settings);render();if(newSheet)syncOuraSheet(true)}},
   syncOura:()=>syncOuraSheet(true),
