@@ -414,6 +414,15 @@ th{font:400 12px/1.2 var(--f);color:var(--muted);border-top:0}
 .pick small{display:block;color:var(--muted);font-size:13px;margin-top:4px}
 .pick:hover,.pick:focus-visible{background:var(--raise)}
 .pick:active{transform:scale(.98)}
+.again-h{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px}.again-h .lab{margin:0}
+.pills{display:flex;gap:2px;padding:3px;border-radius:999px;background:var(--empty)}
+.pills button{border:0;background:none;color:var(--muted);font:500 13px/1 var(--f);padding:8px 12px;border-radius:999px;min-height:32px}
+.pills button[aria-selected="true"]{background:var(--ink);color:var(--on)}
+.again input[type=search]{margin-bottom:6px}
+.again-l{list-style:none;margin:0;padding:0;max-height:46vh;overflow-y:auto}
+.again-i{display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;min-height:52px;padding:8px 0;background:none;border:0;border-top:1px solid var(--line);text-align:left;color:var(--ink)}
+.again-i b{display:block;font-weight:500;font-size:15px}.again-i small{font-size:12px;color:var(--muted)}.again-n{white-space:nowrap}
+.again-all{min-height:40px;color:var(--hot);font-size:14px}
 .again{margin:0 0 14px;padding-bottom:14px;border-bottom:1px solid var(--line)}
 .more{margin:16px 0 0;border-top:1px solid var(--line);padding-top:4px}
 .more summary{min-height:44px;display:flex;align-items:center;font:500 14px/1.2 var(--f);cursor:pointer;list-style:none}
@@ -1313,6 +1322,19 @@ function paceNote(rate,need){
   if(need<0&&rate>=0)return 'The goal needs you to lose, but your average is flat or rising. Trim a little, mostly on rest days.';
   const gain=need>0;return rate<need===gain?(gain?'Gaining slower than the goal pace. A small surplus on training days closes that gap.':'Losing slower than the goal pace. A small cut on rest days closes that gap.')
     :(gain?'Gaining faster than the goal pace, which usually means more fat along with the muscle.':'Losing faster than the goal pace, which risks losing muscle too.')}
+// every meal he has logged, once per name: latest version, how often, when last
+function mealLibrary(){const by={};
+  Object.entries(S.meals).forEach(([id,m])=>{const k=(m.title||'').trim().toLowerCase();if(!k||!(m.items||[]).length)return;const e=by[k];
+    if(!e){by[k]={m:{id,...m},n:1,last:m.date};return}e.n++;if(m.date>e.last||(m.date===e.last&&(m.t||0)>(e.m.t||0))){e.m={id,...m};e.last=m.date}});
+  return Object.values(by)}
+let againSort='recent',againAll=false;
+function againHTML(){const lib=mealLibrary();if(!lib.length)return '';
+  lib.sort(againSort==='freq'?(a,b)=>b.n-a.n||b.last.localeCompare(a.last):(a,b)=>b.last.localeCompare(a.last)||b.n-a.n);
+  const sh=againAll?lib:lib.slice(0,8);
+  return `<div class="again"><div class="again-h"><p class="lab">Eat it again</p><div class="pills" role="tablist"><button role="tab" data-a="againSort" data-k="recent" aria-selected="${againSort==='recent'}">Recent</button><button role="tab" data-a="againSort" data-k="freq" aria-selected="${againSort==='freq'}">Most eaten</button></div></div>
+    ${lib.length>8?`<input id="againQ" type="search" placeholder="Search your ${lib.length} meals" autocomplete="off">`:''}
+    <ul class="again-l">${(lib.length>8?lib:sh).map((e,i)=>{const x=mealTotals(e.m);return `<li${!againAll&&i>=8?' class="more-row" hidden':''} data-q="${esc(e.m.title.toLowerCase())}"><button class="again-i" data-a="readdMeal" data-id="${e.m.id}"><span><b>${esc(e.m.title)}</b><small>${Math.round(x.kcal)} kcal · ${Math.round(x.p)} g protein</small></span><small class="again-n">${e.n>1?e.n+'× · ':''}${fmtShort(e.last)}</small></button></li>`}).join('')}</ul>
+    ${lib.length>8&&!againAll?`<button class="linkbtn again-all" data-a="againAll">Show all ${lib.length}</button>`:''}</div>`}
 function recentMeals(){
   const seen=new Set(),out=[];
   Object.entries(S.meals).map(([id,m])=>({id,...m})).sort((a,b)=>b.date.localeCompare(a.date)||(b.t||0)-(a.t||0)).forEach(m=>{const k=(m.title||'').trim().toLowerCase();if(!k||seen.has(k))return;seen.add(k);out.push(m)});
@@ -1419,9 +1441,9 @@ function openMeal(existing){
 }
 function renderMeal(){
   const m=mealDraft;
-  const rec=!m.id&&!m.items.some(i=>i.name||i.kcal)&&!m.desc?recentMeals().slice(0,6):[];
+  const rec=!m.id&&!m.items.some(i=>i.name||i.kcal)&&!m.desc?recentMeals().slice(0,1):[];
   if(!AI&&!m.items.length)m.items=[{name:'',kcal:null,protein:null,carbs:null,fat:null}];
-  openSheet(head(m.id?'Edit meal':'Log a meal')+(rec.length?`<div class="again"><p class="lab">Eat it again</p><div class="chips">${rec.map(r=>{const x=mealTotals(r);return `<button class="chip" data-a="readdMeal" data-id="${r.id}">${esc(r.title)}<small>${Math.round(x.kcal)} kcal</small></button>`}).join('')}</div></div>`:'')+`<div class="g2"><label>Meal<select id="m_slot">${SLOTS.map(s=>`<option${m.slot===s?' selected':''}>${s}</option>`).join('')}</select></label><label>Date<input type="date" id="m_date" value="${esc(m.date)}"></label></div>
+  openSheet(head(m.id?'Edit meal':'Log a meal')+(rec.length?againHTML():'')+`<div class="g2"><label>Meal<select id="m_slot">${SLOTS.map(s=>`<option${m.slot===s?' selected':''}>${s}</option>`).join('')}</select></label><label>Date<input type="date" id="m_date" value="${esc(m.date)}"></label></div>
   <label style="margin-top:8px">Time eaten<input type="time" id="m_at" value="${esc(m.at||'')}"></label>
   ${AI&&!m.items.length?`${IMG?`<label class="drop snap"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h3l2-3h6l2 3h3v13H4z"/><circle cx="12" cy="13" r="4"/></svg><span>${mealFile?'Photo added · tap to change':'Snap your meal'}</span><small>Claude estimates the macros from the photo</small><input type="file" id="mealPhoto" accept="image/*"></label>`:`<p class="note">${NOIMG}</p>`}
     <label style="margin-top:8px">${IMG?'Anything the photo won’t show? (optional)':'What did you eat?'}<textarea id="m_desc" placeholder="e.g. 200 g chicken thigh, rice cooked in olive oil, a whey shake">${esc(m.desc||'')}</textarea></label>
@@ -2291,6 +2313,7 @@ const A={
   editMeal:b=>{const m=S.meals[b.dataset.id];if(m)openMeal({id:b.dataset.id,...m})},
   delMeal:async()=>{if(mealDraft&&mealDraft.id){const id=mealDraft.id;closeSheet();await deleteMeal(id)}},
   delMealRow:b=>deleteMeal(b.dataset.id),
+  againSort:b=>{againSort=b.dataset.k;againAll=false;renderMeal()},againAll:()=>{againAll=true;document.querySelectorAll('.again-l .more-row').forEach(l=>l.hidden=false);const x=document.querySelector('.again-all');if(x)x.remove()},
   readdMeal:async b=>{const m=S.meals[b.dataset.id];if(!m)return;const h=new Date().getHours();const d=mealDraft?mealDraft.date:sel,id=newId();if(await safe(()=>put('meals',id,{...clean(m),date:d,slot:d===today()?(h<11?'Breakfast':h<16?'Lunch':h<18?'Snack':'Dinner'):m.slot,t:Date.now()}))){if(mealDraft)closeSheet();toast(`Added ${m.title||'meal'}`,()=>safe(()=>del('meals',id)))}},
   openOura:()=>openOura(),readOura:()=>readOura(),
   openFitbod:()=>openFitbod(),fbLater:()=>{try{localStorage.setItem(FBN_KEY,addDays(today(),3))}catch(e){}render()},fbImport:()=>fbImport(),
@@ -2326,6 +2349,7 @@ document.addEventListener('keydown',e=>{
   if(e.key==='Enter'&&e.target.id==='wIn'){e.preventDefault();A.saveW()}
 });
 document.addEventListener('input',e=>{
+  if(e.target.id==='againQ'){const q=e.target.value.trim().toLowerCase();document.querySelectorAll('.again-l li').forEach(l=>{l.hidden=q?!l.dataset.q.includes(q):(!againAll&&l.classList.contains('more-row'))});const x=document.querySelector('.again-all');if(x)x.hidden=!!q;return}
   if(e.target.id==='chatIn'){chatDraft=e.target.value;return}
   const el=e.target,ds=el.dataset;
   if($('#sheet').contains(el)&&!['sumDays','sumDetail'].includes(el.id))sheetDirty=true;
