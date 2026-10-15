@@ -736,7 +736,10 @@ function exerciseIndex(){
   return idx;
 }
 /* ---------- body: tape measurements, Navy body fat, Sunday photos ---------- */
-const navyBF=(waist,neck,h)=>waist&&neck&&h&&waist>neck?Math.round((495/(1.0324-0.19077*Math.log10(waist-neck)+0.15456*Math.log10(h))-450)*10)/10:null;
+// US Navy estimate; anything outside a believable range means a measurement is off, so no number at all
+const navyBF=(waist,neck,h)=>{if(!waist||!neck||!h||waist-neck<20)return null;const v=Math.round((495/(1.0324-0.19077*Math.log10(waist-neck)+0.15456*Math.log10(h))-450)*10)/10;return v>=3&&v<=45?v:null};
+// believable ranges for a man (cm); below the floor it was usually typed in inches
+const TAPE={waist:[55,160],neck:[25,60],chest:[60,170],arm:[18,65]};
 const bodyDays=()=>Object.keys(S.body).filter(isDate).sort();
 const blob=id=>useGas()?photoSrc(id):'/_blob/'+id;
 let bodyFiles=[],bodyNew={},cmpA=null;
@@ -756,7 +759,12 @@ function openBody(d){d=d||sel;const b=S.body[d]||{},ph=(b.photos||[]),P=posed(ph
       :'<p class="note">Progress photos need the app opened from its claude.ai link.</p>'}
     <div class="actions"><button class="btn primary" data-a="bodySave" data-d="${d}">Save</button></div>`)}
 async function bodySave(d){const btn=document.querySelector('[data-a=bodySave]');
-  const cur=clean(S.body[d]||{}),o={...cur};['waist','neck','chest','arm'].forEach(k=>{const v=num($('#b_'+k).value);if(v!=null)o[k]=v;else delete o[k]});
+  const cur=clean(S.body[d]||{}),o={...cur};
+  for(const k of ['waist','neck','chest','arm']){const v=num($('#b_'+k).value);if(v==null){delete o[k];continue}const [lo,hi]=TAPE[k];
+    if(v<lo||v>hi){const cm=Math.round(v*2.54*10)/10,inch=v*2.54>=lo&&v*2.54<=hi,el=$('#b_'+k);el.focus();
+      toast(`${k[0].toUpperCase()+k.slice(1)} ${v} cm doesn’t look right${inch?`. If that was inches, it’s ${cm} cm`:''}.`,inch?()=>{el.value=cm}:null,inch?`Use ${cm}`:undefined);return}
+    o[k]=v}
+  if(o.waist!=null&&o.neck!=null&&o.waist-o.neck<20){$('#b_waist').focus();toast('Waist should be well above neck. Check both, then save again.');return}
   const poses=Object.keys(bodyNew),gone=[];
   if(poses.length&&ASSETS){if(btn){btn.disabled=true;btn.innerHTML=busy('Uploading…')}const P=posed(o.photos||[]),out={front:P.front,side:P.side};
     for(const pose of poses){try{const r=await ASSETS.upload(bodyNew[pose].blob);if(out[pose])gone.push(out[pose].id);out[pose]={id:r.id,pose}}
@@ -770,6 +778,7 @@ function bodyCard(){const ds=bodyDays(),m=ds.filter(d=>S.body[d].waist!=null),la
   const L=last?S.body[last]:null,F=first?S.body[first]:null,bf=bodyBF(L),bf0=bodyBF(F),df=(a,b,u)=>a!=null&&b!=null&&a!==b?` <small>${a-b>0?'+':'−'}${r1(Math.abs(a-b))}${u} since ${fmtShort(first)}</small>`:'';
   const w=ma7(last||today());
   return `<section class="card"><div class="card-h"><h2>Body</h2><button class="btn small" data-a="openBody">Measure</button></div>
+    ${L&&bf==null&&L.waist!=null&&L.neck!=null?`<p class="due">The ${fmtShort(last)} waist (${L.waist} cm) and neck (${L.neck} cm) can’t give a body-fat estimate. One of them is likely off; tap Measure to fix it.</p>`:''}
     ${L?`<dl class="spec"><div><dt>Body fat (Navy)</dt><dd><b>${bf??'–'}</b> %${df(bf,bf0,'%')}</dd></div>
       <div><dt>Waist</dt><dd><b>${L.waist}</b> cm${df(num(L.waist),num(F.waist),' cm')}</dd></div>
       ${bf!=null&&w!=null?`<div><dt>Lean mass</dt><dd><b>${r1(w*(1-bf/100))}</b> kg${bf0!=null&&ma7(first)!=null?df(r1(w*(1-bf/100)),r1(ma7(first)*(1-bf0/100)),' kg'):''}</dd></div>`:''}
