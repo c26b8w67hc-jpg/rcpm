@@ -1785,9 +1785,10 @@ function ouraKind(activity,label){const s=(activity+' '+label).toLowerCase();
   return 'other'}
 // The ring logs everything it notices: walks to the shop, bike commutes, a night out dancing.
 // Only keep what looks like training.
-function ouraKeep(kind,activity,mins,km){
+function ouraKeep(kind,activity,mins,km,source){
   if(kind==='gym'||kind==='walk'||/danc/i.test(activity))return false; // lifting comes from Fitbod
-  if(kind==='spin'&&km)return mins>=60; // outdoor ride with distance: short ones are commutes
+  if(/workout_heart_rate|manual/i.test(source||''))return mins>=20; // he started it on the ring: it's training
+  if(kind==='spin'&&km>=1)return mins>=60; // outdoor ride with real distance: short ones are commutes (indoor bikes report ~0 km)
   return mins>=(kind==='run'?20:45);
 }
 async function importOuraWorkouts(rows){
@@ -1801,7 +1802,7 @@ async function importOuraWorkouts(rows){
     // a strength session on the ring only lends its duration to that day's Fitbod workout
     if(kind==='gym'&&mins>=30){const fb=Object.entries(S.workouts).find(([k,w])=>w.date===date&&w.kind==='gym'&&(w.source==='fitbod-csv'||w.source==='scan'));
       if(fb&&fb[1].mins==null){try{await put('workouts',fb[0],{...fb[1],mins,kcal:fb[1].kcal??num(r.kcal)});n++}catch(e){}}}
-    if(!ouraKeep(kind,r.activity||'',mins,num(r.km)))continue;
+    if(!ouraKeep(kind,r.activity||'',mins,num(r.km),r.source))continue;
     keep.add(id);
     if(cur&&cur.source!=='oura')continue; // you edited it; leave it alone
     const act=String(r.activity||'').replace(/_/g,' ');
