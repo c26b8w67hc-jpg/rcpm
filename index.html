@@ -162,7 +162,8 @@ main>.card:first-child,main>details:first-child{margin-top:16px}
 .todo-box svg{width:14px;height:14px;stroke:var(--on);fill:none;stroke-width:3;stroke-linecap:round;stroke-linejoin:round}
 .todo-row.is-done .todo-box{background:var(--good);border-color:var(--good)}
 .todo-t{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px;justify-content:center;color:var(--ink)}
-#sec-protein,#sec-train,#sec-stack{scroll-margin-top:72px}
+#sec-protein,#sec-train,#sec-stack,#sec-steps{scroll-margin-top:72px}
+.steps-m{display:grid;grid-template-columns:auto 1fr;align-items:center;gap:12px;margin:0 0 10px;font-size:13px;color:var(--muted)}.steps-m b{font-size:22px;color:var(--ink);margin-right:4px}.steps-m .track{height:6px}.steps-m .track i{background:var(--ink)}.steps-m.hit .track i{background:var(--good)}
 @keyframes flash{0%,40%{background:rgba(168,169,252,.14)}100%{background:transparent}}
 .lrow.flash{animation:flash 1.4s var(--ease)}
 .todo-t b{font:500 15px/1.25 var(--f)}
@@ -563,7 +564,7 @@ const KINDS={
   spin:{label:'Spin',c:'var(--violet)'},barrys:{label:"Barry's",c:'var(--crimson)'},walk:{label:'Walk',c:'var(--stone)'},other:{label:'Other',c:'var(--muted)'}
 };
 const SLOTS=['Breakfast','Lunch','Dinner','Snack','Pre-workout','Post-workout'];
-const DEFAULTS={heightCm:190,kcal:3000,protein:165,carbs:380,fat:90,goalKg:85,goalDate:'2027-04-30',name:'',weekly:6,gymMin:4,goalLook:'lean and athletic: broad shoulders, full upper chest, visible arms, visible abs',workStart:'09:00',workEnd:'18:00',ouraSheetId:'',
+const DEFAULTS={heightCm:190,kcal:3000,protein:165,carbs:380,fat:90,goalKg:85,goalDate:'2027-04-30',name:'',weekly:6,gymMin:4,stepGoal:10000,goalLook:'lean and athletic: broad shoulders, full upper chest, visible arms, visible abs',workStart:'09:00',workEnd:'18:00',ouraSheetId:'',
   coachNotes:'',
   stack:[{name:'Creatine',dose:'5 g',when:'Any time'},{name:'Whey protein',dose:'1–2 scoops',when:'Breakfast'},{name:'Vitamin D3 + K2',dose:'4000 IU',when:'Morning'},{name:'Vitamin C',dose:'',when:'Morning'},
     {name:'Omega-3',dose:'',when:'With food'},{name:'Zinc',dose:'',when:'Evening'},{name:'Ashwagandha KSM-66',dose:'',when:'Evening'},
@@ -1121,7 +1122,8 @@ function todoList(d){
      act:`<span class="todo-w"><input id="wIn" type="text" inputmode="decimal" autocomplete="off" placeholder="kg" value="${w?esc(w.kg):''}" aria-label="Weight in kg"><button class="btn small${w?'':' primary'}" data-a="saveW">${w?'Update':'Log'}</button></span>`},
     {k:'protein',done:t.p>=st.protein,label:'Hit protein',detail:`${Math.round(t.p)} / ${st.protein} g`,act:''},
     {k:'train',done:ws.length>0,label:'Train',detail:ws.length?ws.map(x=>esc((KINDS[x.kind]||KINDS.other).label)+(x.mins?' '+x.mins+' min':'')).join(', '):(d===today()?'Nothing logged yet':'Rest day'),act:''},
-    {k:'stack',done:nT>=nS,label:'Supplements',detail:`${nT} of ${nS} taken`,act:''}
+    {k:'stack',done:nT>=nS,label:'Supplements',detail:`${nT} of ${nS} taken`,act:''},
+    ...((()=>{const g=st.stepGoal||10000,n=num((S.oura[d]||{}).steps);return n==null&&d!==today()?[]:[{k:'steps',done:n!=null&&n>=g,label:`${Math.round(g/1000)}k steps`,detail:n!=null?`${n.toLocaleString('en-GB')} / ${g.toLocaleString('en-GB')}${n<g&&d===today()?` · ${(g-n).toLocaleString('en-GB')} to go`:''}`:'Waiting for the ring',act:''}]})())
   ];
   if(parseYmd(d).getDay()===0){const b=S.body[d]||{},np=(b.photos||[]).length;items.push({k:'body',done:b.waist!=null&&(np>0||!ASSETS),label:'Sunday check-in',detail:[b.waist!=null?'Measured':'Waist and neck',ASSETS?(np?np+' photo'+(np>1?'s':''):'photos'):''].filter(Boolean).join(' · '),act:''})}
   const nd=items.filter(x=>x.done).length,ord=items; // fixed order: rows never move under the thumb
@@ -1162,7 +1164,9 @@ function recoveryLine(d){
   const o=S.oura[d];
   const bits=o?[['sleepScore','Sleep'],['readiness','Readiness'],['hrv','HRV'],['sleepHours','']].filter(([k])=>o[k]!=null).map(([k,l])=>k==='sleepHours'?`<span>Slept <b class="num">${r1(o[k])}</b> h</span>`:`<span>${l} <b class="num">${esc(o[k])}</b></span>`):[];
   const syncNote=S.settings.ouraSheetId&&d===today()&&(ouraSyncing||ouraSyncBad)?ouraSyncLine():'';
-  return `<div class="lrow"><div class="lmain"><h2 class="lab">Recovery</h2>
+  const sg=S.settings.stepGoal||10000,sn=o?num(o.steps):null;
+  return `<div class="lrow" id="sec-steps"><div class="lmain"><h2 class="lab">Recovery</h2>
+    ${sn!=null?`<div class="steps-m${sn>=sg?' hit':''}"><span><b class="num">${sn.toLocaleString('en-GB')}</b> steps</span><span class="track"><i data-bar="steps" style="width:${Math.min(100,sn/sg*100).toFixed(1)}%"></i></span></div>`:''}
     ${bits.length?`<p class="recov-v">${bits.join('')}</p>`:`<p class="meta">${S.settings.ouraSheetId&&d===today()?'No ring data yet today.':'No Oura numbers for this day.'}</p>`}${syncNote}</div>
     <button class="btn small ghost" data-a="openOura">${o?'Edit':'Add'}</button></div>`;
 }
@@ -1313,7 +1317,7 @@ setup(){
   <section class="card"><div class="card-h"><h2>Goal</h2></div>
     <div class="g2">${f('goalKg','Goal weight (kg)')}${f('goalDate','By','date')}${f('weekly','Sessions per week')}</div>
     <div class="g2">${f('workStart','Work starts (Mon–Fri)','time')}${f('workEnd','Work ends','time')}</div>
-    <div class="g2">${f('gymMin','Gym days per week (minimum)')}</div>
+    <div class="g2">${f('gymMin','Gym days per week (minimum)')}${f('stepGoal','Daily steps goal')}</div>
     <label style="margin-top:8px">The look you’re aiming for (the Sunday review judges against this)<textarea id="set_goalLook" data-sk="goalLook" style="min-height:64px">${esc(s.goalLook||'')}</textarea></label>
     <label style="margin-top:8px">Notes for the coach read-out<textarea id="set_coachNotes" data-sk="coachNotes">${esc(s.coachNotes)}</textarea></label></section>
   <section class="card"><div class="card-h"><h2>Oura auto-sync</h2></div>
@@ -2450,7 +2454,7 @@ const A={
   addSupp:()=>{setDraft.stack.push({name:'',dose:'',when:''});suppEdit=setDraft.stack.length-1;render();const i=document.getElementById('sn'+(setDraft.stack.length-1));if(i)i.focus()},
   rmSupp:b=>{setDraft.stack.splice(+b.dataset.i,1);suppEdit=-1;render()},
   apiSave:()=>apiSave(),
-  saveSet:async()=>{const s=clean(setDraft);['kcal','protein','carbs','fat','goalKg','weekly','gymMin'].forEach(k=>{const v=num(s[k]);s[k]=v==null?DEFAULTS[k]:v});if(!isDate(s.goalDate))s.goalDate=DEFAULTS.goalDate;['workStart','workEnd'].forEach(k=>{if(s[k]&&hm(s[k])==null)s[k]=DEFAULTS[k]});if(String(setDraft.ouraSheetId||'').trim()&&!sheetIdFrom(setDraft.ouraSheetId)){toast('That doesn’t look like a Google Sheet link or ID. Paste the full link from the sheet’s address bar.');return}s.ouraSheetId=sheetIdFrom(s.ouraSheetId);s.confirmed=true;s.stack=s.stack.filter(x=>x.name&&x.name.trim()).map(x=>({name:x.name.trim(),dose:(x.dose||'').trim(),when:(x.when||'').trim()}));
+  saveSet:async()=>{const s=clean(setDraft);['kcal','protein','carbs','fat','goalKg','weekly','gymMin','stepGoal'].forEach(k=>{const v=num(s[k]);s[k]=v==null?DEFAULTS[k]:v});if(!isDate(s.goalDate))s.goalDate=DEFAULTS.goalDate;['workStart','workEnd'].forEach(k=>{if(s[k]&&hm(s[k])==null)s[k]=DEFAULTS[k]});if(String(setDraft.ouraSheetId||'').trim()&&!sheetIdFrom(setDraft.ouraSheetId)){toast('That doesn’t look like a Google Sheet link or ID. Paste the full link from the sheet’s address bar.');return}s.ouraSheetId=sheetIdFrom(s.ouraSheetId);s.confirmed=true;s.stack=s.stack.filter(x=>x.name&&x.name.trim()).map(x=>({name:x.name.trim(),dose:(x.dose||'').trim(),when:(x.when||'').trim()}));
     const newSheet=s.ouraSheetId&&s.ouraSheetId!==S.settings.ouraSheetId;
     if(await safe(()=>saveSettings(s),'Setup saved')){setDraft=clean(S.settings);render();if(newSheet)syncOuraSheet(true)}},
   syncOura:()=>syncOuraSheet(true),
