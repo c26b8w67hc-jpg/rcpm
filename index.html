@@ -508,6 +508,30 @@ details.more.card{padding-top:6px}
 .ring .rv{animation:ringIn 1.2s var(--ease) both}
 @keyframes ringIn{from{stroke-dashoffset:var(--c)}}
 @media (prefers-reduced-motion:reduce){.ring .rv{animation:none}}
+/* friends: join, onboarding, connections, owner panel */
+body.gate .tabs,body.gate .daynav,body.gate .resync{display:none}
+body.gate{padding-bottom:env(safe-area-inset-bottom,0px)}
+.gate-v{padding:28px 0 40px}
+.gate-hero{margin:8px 0 20px}
+.gate-t{font:300 30px/1.15 var(--f);letter-spacing:-.02em;margin:0 0 6px}
+.gate-t em{font-size:1.08em}
+.ob .gate-t{margin-top:14px}
+.ob-dots{display:flex;gap:6px}.ob-dots i{flex:1;height:3px;border-radius:2px;background:var(--line2)}.ob-dots i.on{background:var(--good)}
+.choices{display:grid;gap:8px;margin-top:10px}
+.choice{display:flex;flex-direction:column;gap:3px;text-align:left;border:1px solid var(--line2);background:var(--card);border-radius:var(--r-sm);padding:14px 16px;color:var(--ink);font:500 15px/1.3 var(--f);transition:border-color .2s var(--ease),background .2s var(--ease)}
+.choice small{font:400 13px/1.35 var(--f);color:var(--muted)}
+.choice.on{border-color:var(--good);background:rgba(127,216,190,.12)}
+.ob .pills{display:inline-flex}
+.conn-r{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 0;border-top:1px solid var(--line)}
+.card-h+.conn-r{border-top:0}
+.conn-r>div{display:flex;flex-direction:column;gap:2px;min-width:0}
+.conn-r small{font-size:13px;color:var(--muted)}
+.conn-how{padding:4px 0 12px}
+.conn-how a{color:var(--hot)}
+.invite{margin-top:14px;padding:14px;border-radius:var(--r-sm);background:rgba(127,216,190,.1);border:1px solid rgba(127,216,190,.3)}
+.invite-c{font:300 34px/1 var(--f);letter-spacing:.18em;margin:4px 0 0}
+.msg-src{display:block;margin-top:6px;font-size:12px;color:var(--muted)}
+.msg-src .linkbtn{font-size:12px;width:auto;min-height:0;display:inline;text-decoration:underline;color:var(--ink)}
 </style>
 </head>
 <body>
@@ -565,11 +589,18 @@ const KINDS={
   spin:{label:'Spin',c:'var(--violet)'},barrys:{label:"Barry's",c:'var(--crimson)'},walk:{label:'Walk',c:'var(--stone)'},other:{label:'Other',c:'var(--muted)'}
 };
 const SLOTS=['Breakfast','Lunch','Dinner','Snack','Pre-workout','Post-workout'];
-const DEFAULTS={heightCm:190,kcal:3000,protein:165,carbs:380,fat:90,goalKg:85,goalDate:'2027-04-30',name:'',weekly:6,gymMin:4,stepGoal:10000,goalLook:'lean and athletic: broad shoulders, full upper chest, visible arms, visible abs',workStart:'09:00',workEnd:'18:00',ouraSheetId:'',
+const DEFAULTS={heightCm:190,sex:'male',goalType:'gain',city:'Barcelona',shop:'Mercadona',classWords:'corehaus=lagree, lapso=spin',kcal:3000,protein:165,carbs:380,fat:90,goalKg:85,goalDate:'2027-04-30',name:'',weekly:6,gymMin:4,stepGoal:10000,goalLook:'lean and athletic: broad shoulders, full upper chest, visible arms, visible abs',workStart:'09:00',workEnd:'18:00',ouraSheetId:'',
   coachNotes:'',
   stack:[{name:'Creatine',dose:'5 g',when:'Any time'},{name:'Whey protein',dose:'1–2 scoops',when:'Breakfast'},{name:'Vitamin D3 + K2',dose:'4000 IU',when:'Morning'},{name:'Vitamin C',dose:'',when:'Morning'},
     {name:'Omega-3',dose:'',when:'With food'},{name:'Zinc',dose:'',when:'Evening'},{name:'Ashwagandha KSM-66',dose:'',when:'Evening'},
     {name:'L-theanine',dose:'',when:'Evening'},{name:'Magnesium glycinate',dose:'400 mg',when:'Before bed'}]};
+
+const GOALS={gain:{label:'Build muscle',sub:'Lean gain: a small surplus, slow scale gain',ai:'lean gain'},cut:{label:'Lose fat',sub:'A steady deficit, keep the muscle',ai:'fat loss while keeping muscle'},recomp:{label:'Recomp',sub:'Lose fat and build muscle at about the same weight',ai:'recomp: lose fat and build muscle at about the same weight'}};
+const goalAI=st=>(GOALS[st.goalType]||GOALS.gain).ai;
+const whereText=st=>[st.city?'Lives in '+st.city:'',st.shop?'shops at '+st.shop:''].filter(Boolean).join(', ')||'Location unknown';
+const shopName=()=>S.settings.shop||'the supermarket';
+const female=()=>S.settings.sex==='female';
+function personText(st){const w=latestWeight();return `${st.heightCm||'?'} cm${w?', ~'+Math.round(w.kg)+' kg':''} ${st.sex==='female'?'woman':'man'}${st.age?', '+st.age:''} who lifts`}
 
 /* ---------- store ---------- */
 const COLS=['weights','workouts','meals','supps','oura','coach','body','exp','plans','reviews'];
@@ -622,6 +653,12 @@ const APIKEY='rcmp.api',OBKEY='rcmp.outbox';
 let API=null;try{API=JSON.parse(localStorage.getItem(APIKEY)||'null')}catch(e){}
 const hasClaude=()=>!!(window.claude&&typeof window.claude.use==='function');
 const useGas=()=>!hasClaude()&&!!(API&&API.url&&API.token);
+// who this is, from the backend: the owner (Bence's TOKEN) or a friend (friends.gs)
+let ME=null;try{ME=JSON.parse(localStorage.getItem('rcmp.me')||'null')}catch(e){}
+const saveMe=()=>{try{localStorage.setItem('rcmp.me',JSON.stringify(ME))}catch(e){}};
+const isFriend=()=>useGas()&&!!(ME&&ME.owner===false);
+const isOwnerGas=()=>useGas()&&!!(ME&&ME.owner);
+let gasReady=false,gasErr='';
 async function gas(op,body,extra='',signal){
   const u=API.url+(API.url.includes('?')?'&':'?')+'op='+op+'&token='+encodeURIComponent(API.token)+extra;
   const r=await fetch(u,body?{method:'POST',body:JSON.stringify(body),headers:{'Content-Type':'text/plain;charset=utf-8'},signal}:{signal});
@@ -640,11 +677,11 @@ async function flush(){
   flushing=false;schedule()}
 let bootSheet=null;
 async function gasLoad(){
-  try{let r;try{r=await gas('boot')}catch(e){if(e&&e.code==='bad_op')r=await gas('load');else throw e}const {data,fileContent}=r;if(fileContent)bootSheet={text:fileContent,at:Date.now()};
+  try{let r;try{r=await gas('boot')}catch(e){if(e&&e.code==='bad_op')r=await gas('load');else throw e}const {data,fileContent}=r;if(fileContent)bootSheet={text:fileContent,at:Date.now()};if(r.me){ME=r.me;saveMe()}gasReady=true;gasErr='';
     for(const c of COLS)S[c]=(data&&data[c])||{};S.settings={...clean(DEFAULTS),...((data&&data.settings)||{})};
     outbox.forEach(applyOp); // edits that haven't reached the server yet still win
     dataVer++;saveLocal();if(!setDirty())setDraft=null;schedule();flush();if(!ouraSyncing)setTimeout(()=>syncOuraSheet(false),0)}
-  catch(e){if(e&&e.code==='bad_token')toast('The app’s backend token is wrong. Fix it in Setup.');else console.warn('load',e)}}
+  catch(e){if(e&&e.code==='bad_token'){gasErr=ME&&ME.owner===false?'This account was removed. Ask '+OWNER+' for a new invite.':'The app’s backend token is wrong.';toast(gasErr+(ME&&ME.owner===false?'':' Fix it in Setup.'))}else{gasErr='Couldn’t reach RCMP. Check your connection.';console.warn('load',e)}schedule()}}
 window.addEventListener('online',flush);
 let lastGasLoad=0;document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&mode==='gas'){flush();if($('#sheet').hidden&&Date.now()-lastGasLoad>3e5){lastGasLoad=Date.now();gasLoad()}}});
 // Claude through the backend: same shape as claude.ai's sample (AI(input, opts) → {text}; AI.json → parsed)
@@ -652,6 +689,7 @@ function gasAI(){
   const call=async(input,opts={})=>{
     const messages=typeof input==='string'?[{role:'user',content:input}]:input.map(m=>({role:m.role,content:m.content}));
     const r=await gas('ai',{messages,effort:opts.modelTier==='quick'?'low':'medium',max_tokens:opts.json?12000:4000},'',opts.signal);
+    if(r.spent!=null&&ME&&ME.ai){ME.ai.spent=r.spent;saveMe()}
     if(opts.onText)try{opts.onText({text:r.text,delta:r.text})}catch(e){}
     return {text:r.text,truncated:r.stop_reason==='max_tokens'}};
   const ai=(input,opts)=>call(input,opts);
@@ -710,7 +748,7 @@ function aiErr(e){
   if(['not_granted','sampling_disabled','not_declared','capability_disabled','capability_removed'].includes(c)){AI=null;schedule();return 'Claude access is off for this visit, so AI reading is unavailable. You can still log everything by hand.'}
   if(c==='images_unavailable'){IMG=false;schedule();return 'Image reading isn’t available in this view. Describe it in text instead.'}
   if(c==='rate_limited')return 'Too many requests right now. Give it a minute and try again.';
-  if(c==='cap')return 'This month’s AI budget is used up. Raise AI_MONTHLY_USD in the Apps Script if you want more.';
+  if(c==='cap')return isFriend()?'You’ve used this month’s AI budget. The built-in answers still work, and it resets on the 1st.':'This month’s AI budget is used up. Raise AI_MONTHLY_USD in the Apps Script if you want more.';
   if(c==='no_key')return 'The coach isn’t set up yet: add ANTHROPIC_KEY to the Apps Script’s Script properties.';
   if(c==='network')return 'Couldn’t reach the backend. Check your connection.';
   if(c==='image_rejected')return 'That image couldn’t be read. Try a PNG or JPEG screenshot.';
@@ -725,7 +763,7 @@ function aiErr(e){
 // Lifting comes from Fitbod; everything else from Oura from the day the ring's sheet data starts.
 // Fitbod's own runs/rides/walks still count for the time before that.
 let _pol={o:null,since:null};
-function ouraSince(){if(_pol.o!==S.oura||_pol.v!==dataVer){_pol.o=S.oura;_pol.v=dataVer;_pol.since=Object.entries(S.oura).filter(([d,o])=>isDate(d)&&o&&o.src==='sheet').map(([d])=>d).sort()[0]||null}return _pol.since}
+function ouraSince(){if(_pol.o!==S.oura||_pol.v!==dataVer){_pol.o=S.oura;_pol.v=dataVer;_pol.since=Object.entries(S.oura).filter(([d,o])=>isDate(d)&&o&&o.src==='sheet'&&(o.readiness!=null||o.sleepScore!=null)).map(([d])=>d).sort()[0]||null}return _pol.since}
 const countsW=w=>!(w.source==='fitbod-csv'&&w.kind!=='gym'&&ouraSince()&&w.date>=ouraSince());
 // Views ask for one day's sessions/meals hundreds of times per render; index them by date once per data change.
 let dataVer=0;const _ix={v:-1};
@@ -759,22 +797,27 @@ function exerciseIndex(){
 }
 /* ---------- body: tape measurements, Navy body fat, Sunday photos ---------- */
 // US Navy estimate; anything outside a believable range means a measurement is off, so no number at all
-const navyBF=(waist,neck,h)=>{if(!waist||!neck||!h||waist-neck<20)return null;const v=Math.round((495/(1.0324-0.19077*Math.log10(waist-neck)+0.15456*Math.log10(h))-450)*10)/10;return v>=3&&v<=45?v:null};
-// believable ranges for a man (cm); below the floor it was usually typed in inches
-const TAPE={waist:[55,160],neck:[25,60],chest:[60,170],arm:[18,65]};
+// women: waist + hip − neck (hip at its widest)
+const navyBF=(waist,neck,h,hip)=>{if(!waist||!neck||!h||waist-neck<20)return null;
+  const v=hip!==undefined?(hip?Math.round((495/(1.29579-0.35004*Math.log10(waist+hip-neck)+0.221*Math.log10(h))-450)*10)/10:null)
+    :Math.round((495/(1.0324-0.19077*Math.log10(waist-neck)+0.15456*Math.log10(h))-450)*10)/10;
+  return v!=null&&v>=3&&v<=55?v:null};
+// believable ranges (cm); below the floor it was usually typed in inches
+const TAPE={waist:[50,160],neck:[22,60],hip:[60,170],chest:[60,170],arm:[16,65]};
 const bodyDays=()=>Object.keys(S.body).filter(isDate).sort();
 const blob=id=>useGas()?photoSrc(id):'/_blob/'+id;
 let bodyFiles=[],bodyNew={},cmpA=null,phOverlay=false,ovPos=50;
 // old entries may carry two 'side' labels: the first photo of a day is the front
 const posed=ph=>{const f=ph.find(x=>x.pose==='front');return {front:f||ph[0]||null,side:ph.find(x=>x!==(f||ph[0])&&x.pose==='side')||ph.find(x=>x!==(f||ph[0]))||null}};
-function bodyBF(b){return b?navyBF(num(b.waist),num(b.neck),num(S.settings.heightCm)||190):null}
+function bodyBF(b){return b?navyBF(num(b.waist),num(b.neck),num(S.settings.heightCm)||175,female()?num(b.hip):undefined):null}
 function openBody(d){d=d||sel;const b=S.body[d]||{},ph=(b.photos||[]),P=posed(ph);bodyNew={};
   openSheet(head('Body · '+fmtDay(d))+`<div class="grid2">
     <label>Waist (cm)<input id="b_waist" type="text" inputmode="decimal" value="${b.waist??''}"></label>
     <label>Neck (cm)<input id="b_neck" type="text" inputmode="decimal" value="${b.neck??''}"></label>
+    ${female()?`<label>Hip, widest (cm)<input id="b_hip" type="text" inputmode="decimal" value="${b.hip??''}"></label>`:''}
     <label>Chest (cm, optional)<input id="b_chest" type="text" inputmode="decimal" value="${b.chest??''}"></label>
     <label>Arm, flexed (cm, optional)<input id="b_arm" type="text" inputmode="decimal" value="${b.arm??''}"></label></div>
-    <p class="note">Morning, relaxed, tape level and snug: waist at the navel, neck just below the Adam's apple. Waist and neck give the body-fat estimate (US Navy method, about ±3%).</p>
+    <p class="note">Morning, relaxed, tape level and snug: waist at the navel, neck just below the larynx${female()?', hip at its widest':''}. ${female()?'Waist, hip and neck':'Waist and neck'} give the body-fat estimate (US Navy method, about ±3%).</p>
     ${ASSETS?`<h3 style="margin-top:14px">Progress photos</h3>
       <div class="ph-row">${['front','side'].map(pose=>{const x=P[pose];return `<figure class="ph ph-slot"><label class="ph-pick" id="slot-${pose}">${x?`<img src="${blob(x.id)}" alt="${pose} ${fmtDay(d)}">`:`<span class="ph-add">+</span>`}<input type="file" accept="image/*" data-pose="${pose}" class="sr"></label><figcaption>${pose==='front'?'Front':'Side'}${x?` · <button class="linkbtn" data-a="bodyPhDel" data-d="${d}" data-id="${x.id}">Remove</button>`:''}</figcaption></figure>`}).join('')}</div>
       <p class="note">Tap a slot to take or replace that photo. Same spot, same light, Sunday morning before eating. Only you can see these.</p>`
@@ -782,7 +825,7 @@ function openBody(d){d=d||sel;const b=S.body[d]||{},ph=(b.photos||[]),P=posed(ph
     <div class="actions"><button class="btn primary" data-a="bodySave" data-d="${d}">Save</button></div>`)}
 async function bodySave(d){const btn=document.querySelector('[data-a=bodySave]');
   const cur=clean(S.body[d]||{}),o={...cur};
-  for(const k of ['waist','neck','chest','arm']){const v=num($('#b_'+k).value);if(v==null){delete o[k];continue}const [lo,hi]=TAPE[k];
+  for(const k of ['waist','neck','hip','chest','arm']){const el0=$('#b_'+k);if(!el0)continue;const v=num(el0.value);if(v==null){delete o[k];continue}const [lo,hi]=TAPE[k];
     if(v<lo||v>hi){const cm=Math.round(v*2.54*10)/10,inch=v*2.54>=lo&&v*2.54<=hi,el=$('#b_'+k);el.focus();
       toast(`${k[0].toUpperCase()+k.slice(1)} ${v} cm doesn’t look right${inch?`. If that was inches, it’s ${cm} cm`:''}.`,inch?()=>{el.value=cm}:null,inch?`Use ${cm}`:undefined);return}
     o[k]=v}
@@ -800,7 +843,7 @@ function bodyCard(){const ds=bodyDays(),m=ds.filter(d=>S.body[d].waist!=null),la
   const L=last?S.body[last]:null,F=first?S.body[first]:null,bf=bodyBF(L),bf0=bodyBF(F),df=(a,b,u)=>a!=null&&b!=null&&a!==b?` <small>${a-b>0?'+':'−'}${r1(Math.abs(a-b))}${u} since ${fmtShort(first)}</small>`:'';
   const w=ma7(last||today());
   return `<section class="card"><div class="card-h"><h2>Body</h2><button class="btn small" data-a="openBody">Measure</button></div>
-    ${L&&bf==null&&L.waist!=null&&L.neck!=null?`<p class="due">The ${fmtShort(last)} waist (${L.waist} cm) and neck (${L.neck} cm) can’t give a body-fat estimate. One of them is likely off; tap Measure to fix it.</p>`:''}
+    ${L&&bf==null&&L.waist!=null&&L.neck!=null&&(!female()||L.hip!=null)?`<p class="due">The ${fmtShort(last)} waist (${L.waist} cm) and neck (${L.neck} cm) can’t give a body-fat estimate. One of them is likely off; tap Measure to fix it.</p>`:''}
     ${L?`<dl class="spec"><div><dt>Body fat (Navy)</dt><dd><b>${bf??'–'}</b> %${df(bf,bf0,'%')}</dd></div>
       <div><dt>Waist</dt><dd><b>${L.waist}</b> cm${df(num(L.waist),num(F.waist),' cm')}</dd></div>
       ${bf!=null&&w!=null?`<div><dt>Lean mass</dt><dd><b>${r1(w*(1-bf/100))}</b> kg${bf0!=null&&ma7(first)!=null?df(r1(w*(1-bf/100)),r1(ma7(first)*(1-bf0/100)),' kg'):''}</dd></div>`:''}
@@ -1018,7 +1061,8 @@ function render(){
   const ae=document.activeElement;
   const keep=ae&&ae.id&&view.contains(ae)?{id:ae.id,v:ae.value,s:ae.selectionStart}:null;
   const y=window.scrollY;
-  patchView((sel!==today()&&tab==='today'?`<div class="daybar" role="status"><span>Logging to <b>${fmtDay(sel)}</b></span><button class="btn small" data-a="gotoday">Back to today</button></div>`:'')+(VIEWS[tab]||VIEWS.today)());
+  const gate=gateView();document.body.classList.toggle('gate',!!gate);
+  patchView(gate||((sel!==today()&&tab==='today'?`<div class="daybar" role="status"><span>Logging to <b>${fmtDay(sel)}</b></span><button class="btn small" data-a="gotoday">Back to today</button></div>`:'')+(VIEWS[tab]||VIEWS.today)()));
   if(keep){const el=document.getElementById(keep.id);if(el){el.value=keep.v;el.focus({preventScroll:true});try{el.setSelectionRange(keep.s,keep.s)}catch(e){}}}
   if(Math.abs(window.scrollY-y)>1)window.scrollTo(0,y);
   $('#dayname').textContent=sel===today()?'Today':fmtDay(sel);
@@ -1051,7 +1095,8 @@ const FBN_KEY='recomplog.fbNudge';
 const noExercises=w=>w.kind==='gym'&&!(w.exercises||[]).some(e=>e&&e.name);
 function missingGym(){const t=today();return [...Array(14)].map((_,i)=>addDays(t,-i)).flatMap(d=>workoutsOn(d).filter(noExercises)).sort((a,b)=>a.date.localeCompare(b.date))}
 // Data freshness: silent while everything flows; one warning once something is more than a day old.
-function staleAlarm(){if(!S.settings.ouraSheetId)return '';const now=Date.now(),t=today(),issues=[];
+function staleAlarm(){const frO=isFriend()&&ME&&ME.oura&&ME.oura.connected;if(!S.settings.ouraSheetId&&!frO)return '';const now=Date.now(),t=today(),issues=[];
+  if(frO&&ME.oura.err)issues.push('Oura stopped syncing: reconnect it in Setup.');
   const l=lastOuraSync();if(ouraSyncBad&&ouraSyncMsg)issues.push(esc(ouraSyncMsg));
   else if(!l||now-l.at>864e5){const h=l?Math.round((now-l.at)/36e5):0,d=Math.round(h/24);issues.push(`The app last pulled your data ${!l?'never':h<48?h+' hours ago':d+' days ago'}.`)}
   const od=Object.keys(S.oura).filter(d=>isDate(d)&&(S.oura[d].readiness!=null||S.oura[d].sleepScore!=null)).sort().pop();
@@ -1184,8 +1229,9 @@ let prog='weight';
 const PROG=[['weight','Weight'],['training','Training'],['food','Food'],['recovery','Recovery'],['lab','Lab']];
 const VIEWS={
 coach(){
-  if(!AI)return `<section class="card"><div class="card-h"><h2>Coach</h2></div><p class="empty">The coach needs Claude, which works when RCMP is opened from its claude.ai link. If you just opened it, give it a few seconds.</p></section>`;
-  return `<section class="coach"><div class="card-h"><h2>Coach</h2>${chatLoad().length&&!chatBusy?'<button class="btn small" data-a="chatClear">Clear</button>':''}</div>
+  // built-in answers work everywhere; Claude takes the rest when it's reachable
+  const a=isFriend()&&ME&&ME.ai,left=a&&a.cap?Math.max(0,1-(a.spent||0)/a.cap):null;
+  return `<section class="coach"><div class="card-h"><h2>Coach</h2>${left!=null?`<span class="aside">AI ${Math.round(left*100)}% left this month</span>`:''}${chatLoad().length&&!chatBusy?'<button class="btn small" data-a="chatClear">Clear</button>':''}</div>
     <div id="chatLog" class="chat full" aria-live="polite">${chatLogHTML()}</div>
     <div class="chat-bar"><textarea id="chatIn" rows="1" placeholder="Ask your coach" aria-label="Message">${esc(chatDraft)}</textarea><button class="btn primary" data-a="chatSend"${chatBusy?' disabled':''}>Send</button></div></section>`;
 },
@@ -1218,7 +1264,7 @@ train(){
   const nAll=Object.values(S.workouts).filter(countsW).length;
   const all=Object.entries(S.workouts).filter(([,w])=>countsW(w)).map(([id,w])=>({id,...w})).sort((a,b)=>b.date.localeCompare(a.date)||(b.t||0)-(a.t||0)).slice(0,histAll?Infinity:12);
   const lastFb=Object.values(S.workouts).filter(w=>w.source==='fitbod-csv').map(w=>w.date).sort().pop();
-  return weekCard()+`<section class="card"><div class="card-h"><h2>Sessions per week</h2><span class="aside">target ${S.settings.weekly}</span></div>
+  return programCard()+weekCard()+`<section class="card"><div class="card-h"><h2>Sessions per week</h2><span class="aside">target ${S.settings.weekly}</span></div>
     <div class="bars">${bars}<div class="tline" style="bottom:${S.settings.weekly/max*100}%"></div></div><div class="barlab">${labs}</div>
     <div class="legend">${Object.keys(KINDS).filter(k=>weeks.some(w=>w.counts[k])).map(k=>`<span><i style="background:${KINDS[k].c}"></i>${KINDS[k].label}</span>`).join('')}<span><i class="dash"></i>Target</span></div></section>
   ${(()=>{const pl=liftPlan(),rec=recoveryState();if(!pl.length)return '';const sh=planAll?pl:pl.slice(0,8);
@@ -1252,7 +1298,7 @@ food(){
   const plan=`<section class="card"><div class="card-h"><h2>Meal plan</h2>${AI||pw?`<button class="btn small" data-a="openPlan">${pw?'Open':'Plan the week'}</button>`:''}</div>
     ${planBusy?`<p class="note">${busy(esc(planProg||'Planning your week…'))}</p>`:pt?`<ul class="list tight">${Object.entries(pt.slots).map(([sl,id])=>{const m=pt.p.meals[id];return m?`<li class="pm"><span class="pm-s">${esc(sl)}</span><span class="pm-t">${esc(m.title)}</span></li>`:''}).join('')}</ul>
       ${(pt.p.shop||[]).length?`<p class="note">Shopping: ${Object.values(pt.p.got||{}).filter(Boolean).length} of ${pt.p.shop.length} in the basket.</p>`:''}`
-    :`<p class="empty">${AI?'Plan 7 days of meals on your targets, with a Mercadona list grouped by aisle. Best done on Sunday.':'Planning needs Claude, which isn’t reachable right now. Check the app backend in Setup.'}</p>`}</section>`;
+    :`<p class="empty">${AI?`Plan 7 days of meals on your targets, with a ${esc(shopName())} list grouped by aisle. Best done on Sunday.`:'Planning needs Claude, which isn’t reachable right now. Check the app backend in Setup.'}</p>`}</section>`;
   return burn+plan+`<section class="card"><div class="card-h"><h2>Last 14 days</h2><span class="aside">${avgK!=null?`avg ${avgK} kcal, ${avgP} g protein`:''}</span></div>
     <div class="bars">${bars}<div class="tline" style="bottom:${st.kcal/max*100}%"></div></div><div class="barlab">${labs}</div>
     <div class="legend"><span><i style="background:var(--ink)"></i>Protein target reached</span><span><i style="background:color-mix(in srgb,var(--ink) 28%,transparent)"></i>Rest of the day’s calories</span><span><i class="dash"></i>${st.kcal} kcal target</span></div></section>`;
@@ -1304,7 +1350,7 @@ recovery(){
       avgBal>150&&rate<-0.05?`The ring says you eat ${avgBal} kcal a day over your burn, yet your weight is dropping ${(-rate).toFixed(2)} kg a week. Your food log is probably missing some calories.`:
       `Food vs ring burn: ${sgn(avgBal)} kcal a day, and the scale agrees (${sgn(+rate.toFixed(2))} kg a week).`}
   return `<section class="card"><div class="card-h"><h2>This week vs your usual</h2><button class="btn small" data-a="openOura">Enter numbers</button></div>${ouraSyncLine()}
-    ${R2.length?`<p class="verdict">${verdict}</p><table class="cmp"><thead><tr><th></th><th>7 days</th><th>Usual</th><th></th></tr></thead><tbody>${R2.map(r=>`<tr><td>${r.l}</td><td><b>${f(r,r.a)}</b>${r.u?' '+r.u:''}</td><td>${f(r,r.b)}</td><td class="tone${r.tone>0?' up':r.tone<0?' down':''}">${r.tone>0?'Better':r.tone<0?'Lower':'Normal'}</td></tr>`).join('')}</tbody></table><p class="note">Usual is your 28-day average.</p>`:`<p class="empty">${S.settings.ouraSheetId?'Waiting for the ring’s first week of data.':'No Oura data yet. Tap Enter numbers to add a day, or link your Oura sheet in Setup.'}</p>`}
+    ${R2.length?`<p class="verdict">${verdict}</p><table class="cmp"><thead><tr><th></th><th>7 days</th><th>Usual</th><th></th></tr></thead><tbody>${R2.map(r=>`<tr><td>${r.l}</td><td><b>${f(r,r.a)}</b>${r.u?' '+r.u:''}</td><td>${f(r,r.b)}</td><td class="tone${r.tone>0?' up':r.tone<0?' down':''}">${r.tone>0?'Better':r.tone<0?'Lower':'Normal'}</td></tr>`).join('')}</tbody></table><p class="note">Usual is your 28-day average.</p>`:`<p class="empty">${S.settings.ouraSheetId||(isFriend()&&ME&&ME.oura&&ME.oura.connected)?'Waiting for the ring’s first week of data.':isFriend()?'No Oura data yet. Connect your ring in Setup, or tap Enter numbers to add a day.':'No Oura data yet. Tap Enter numbers to add a day, or link your Oura sheet in Setup.'}</p>`}
     ${hPts.length>1?`<h3 style="margin-top:16px">HRV, last 45 days</h3>`+lineChart({series:[{pts:hPts,c:'var(--ink)',dots:false,w:2}],h:110,label:'HRV over time',fmt:v=>Math.round(v)}):''}
   </section>
   ${balNote?`<section class="card"><div class="card-h"><h2>Energy balance</h2></div><p style="margin:0">${balNote}</p></section>`:''}`;
@@ -1312,7 +1358,17 @@ recovery(){
 setup(){
   if(!setDraft)setDraft=clean(S.settings);const s=setDraft;
   const f=(k,l,t='number',extra='')=>`<label>${l}<input id="set_${k}" data-sk="${k}" type="${t==='number'?'text':t}" ${t==='number'?'inputmode="decimal" autocomplete="off"':''} value="${esc(s[k])}" ${extra}></label>`;
-  return connectCard()+`<section class="card"><div class="card-h"><h2>Daily targets</h2></div>
+  const sl=(k,l,opts)=>`<label>${l}<select id="set_${k}" data-sk="${k}">${!s[k]?'<option value="">Choose</option>':''}${Object.entries(opts).map(([v,t])=>`<option value="${v}"${String(s[k]??'')===v?' selected':''}>${esc(t)}</option>`).join('')}</select></label>`;
+  const fr=isFriend(),inj=s.injuries||[];
+  const profile=fr||s.experience?`<section class="card"><div class="card-h"><h2>Profile and program</h2></div>
+    <div class="g2">${sl('goalType','Goal',Object.fromEntries(Object.entries(GOALS).map(([k,g])=>[k,g.label])))}${sl('sex','Sex',{male:'Male',female:'Female'})}</div>
+    <div class="g2">${f('age','Age')}${f('heightCm','Height (cm)')}</div>
+    <div class="g2">${sl('experience','Lifting experience',EXPERIENCE)}${sl('equipment','Where you train',EQUIPMENT)}</div>
+    <p class="lab" style="margin-top:12px">Go easy on</p><div class="chips">${[['back','Lower back'],['knee','Knees'],['shoulder','Shoulders']].map(([k,l])=>`<button class="chip${inj.includes(k)?' on':''}" data-a="setInj" data-k="${k}" aria-pressed="${inj.includes(k)}">${l}</button>`).join('')}</div>
+    <div class="g2" style="margin-top:12px">${f('city','City','text')}${f('shop','Supermarket','text')}</div>
+    <p class="note">Your program follows the gym days per week under Goal: ${esc(program(s).name)}.</p>
+    <div class="actions"><button class="btn small" data-a="recalcT">Recalculate targets from this</button></div></section>`:'';
+  return (fr?accountCard()+connectionsCard():connectCard()+friendsCard())+`<section class="card"><div class="card-h"><h2>Daily targets</h2></div>
     <div class="g2">${f('kcal','Calories (kcal)')}${f('protein','Protein (g)')}${f('carbs','Carbs (g)')}${f('fat','Fat (g)')}</div>
     <p class="note" id="macroNote">${macroNote(s)}</p>
     <div class="row" style="margin-top:12px"><p class="note" style="margin:0;flex:1">Carb cycling: more carbs on training days, fewer on rest days, same weekly total.</p><button class="btn small${S.settings.carbCycle===false?'':' primary'}" data-a="carbCycle">${S.settings.carbCycle===false?'Off':'On'}</button></div></section>
@@ -1321,10 +1377,12 @@ setup(){
     <div class="g2">${f('workStart','Work starts (Mon–Fri)','time')}${f('workEnd','Work ends','time')}</div>
     <div class="g2">${f('gymMin','Gym days per week (minimum)')}${f('stepGoal','Daily steps goal')}</div>
     <label style="margin-top:8px">The look you’re aiming for (the Sunday review judges against this)<textarea id="set_goalLook" data-sk="goalLook" style="min-height:64px">${esc(s.goalLook||'')}</textarea></label>
-    <label style="margin-top:8px">Notes for the coach read-out<textarea id="set_coachNotes" data-sk="coachNotes">${esc(s.coachNotes)}</textarea></label></section>
-  <section class="card"><div class="card-h"><h2>Oura auto-sync</h2></div>
+    <label style="margin-top:8px">Notes for the coach (injuries, preferences, anything useful)<textarea id="set_coachNotes" data-sk="coachNotes">${esc(s.coachNotes)}</textarea></label></section>
+  ${profile}${fr?'':`<section class="card"><div class="card-h"><h2>Oura auto-sync</h2></div>
     <label>Google Sheet ID or link<input id="set_ouraSheetId" data-sk="ouraSheetId" value="${esc(s.ouraSheetId)}" placeholder="Paste the sheet's link"></label>
-    <p class="note">The sheet your Oura Apps Script writes to. The app reads it through your Google Drive connector whenever you open it.</p></section>
+    <p class="note">The sheet your Oura Apps Script writes to. The app reads it through your Google Drive connector whenever you open it.</p>
+    <label style="margin-top:12px">Studio names in your calendar<input id="set_classWords" data-sk="classWords" value="${esc(s.classWords||'')}" placeholder="corehaus=lagree, lapso=spin"></label>
+    <p class="note">name=kind, comma separated. Kinds: ${Object.keys(KINDS).filter(k=>k!=='walk'&&k!=='other').join(', ')}.</p></section>`}
   <section class="card"><div class="card-h"><h2>Supplement stack</h2><button class="btn small" data-a="addSupp">Add</button></div>
     <ul class="list">${s.stack.map((x,i)=>i===suppEdit?`<li class="ex"><div class="ex-top"><input id="sn${i}" data-si="${i}" data-sf="name" value="${esc(x.name)}" placeholder="Name" aria-label="Supplement name"><button class="x-sm" data-a="rmSupp" data-i="${i}" aria-label="Remove ${esc(x.name||'supplement')}">${XI}</button></div><div class="g2" style="margin-top:6px"><input id="sd${i}" data-si="${i}" data-sf="dose" value="${esc(x.dose)}" placeholder="Dose" aria-label="Dose"><input id="sw${i}" data-si="${i}" data-sf="when" value="${esc(x.when)}" placeholder="When" aria-label="When"></div><div class="actions" style="margin-top:8px"><button class="btn small" data-a="suppEdit" data-i="-1">Done</button></div></li>`:
       `<li class="item"><button class="linkbtn body" data-a="suppEdit" data-i="${i}"><div class="t">${esc(x.name||'Unnamed')}</div><div class="s">${[x.dose,x.when].filter(Boolean).map(esc).join(' · ')||'Tap to add dose and time'}</div></button></li>`).join('')}</ul>
@@ -1340,7 +1398,7 @@ setup(){
     <div class="actions"><button class="btn primary" data-a="openSummary">Summary for a Claude chat</button><button class="btn" data-a="exportJson">Download backup</button>
     <label class="btn" style="font-size:15px;color:var(--ink)">Restore backup<input type="file" id="restoreIn" accept="application/json,.json" class="sr"></label></div>
     <p class="note">${Object.keys(S.weights).length} weigh-ins, ${Object.keys(S.workouts).length} sessions, ${Object.keys(S.meals).length} meals, ${Object.keys(S.oura).length} Oura days.</p></section>
-  <details class="more card"><summary>Add it to your phone’s home screen</summary><ol class="steps"><li>Open this page's link in Safari (or Chrome on Android).</li><li>Share, then Add to Home Screen.</li><li>It opens like an app, and your data syncs because it's saved to your Claude account.</li></ol></details>`;
+  <details class="more card"><summary>Add it to your phone’s home screen</summary><ol class="steps"><li>Open this page's link in Safari (or Chrome on Android).</li><li>Share, then Add to Home Screen.</li><li>It opens like an app, and your data syncs because it's saved to your ${mode==='gas'?'account':'Claude account'}.</li></ol></details>`;
 }
 };
 function macroNote(s){const m=Math.round((num(s.protein)||0)*4+(num(s.carbs)||0)*4+(num(s.fat)||0)*9),k=num(s.kcal)||0,off=k?Math.abs(m-k)/k:0;
@@ -1356,7 +1414,7 @@ function tdeeEstimate(){
   const intake=fd.reduce((a,x)=>a+x.kcal,0)/fd.length,tdee=intake-slope*7700;
   const cur=ma7(t)??pts[0][1],wLeft=Math.max(1,(parseYmd(st.goalDate)-parseYmd(t))/6048e5),need=(st.goalKg-cur)/wLeft;
   const raw=tdee+need*7700/7,target=Math.round(Math.max(st.kcal-300,Math.min(st.kcal+300,raw))/50)*50; // move at most 300 a week
-  if(tdee<1800||tdee>5000)return {ready:false,odd:true,tdee:Math.round(tdee),intake:Math.round(intake),foodDays:fd.length,weighDays:n};
+  if(tdee<1200||tdee>5000)return {ready:false,odd:true,tdee:Math.round(tdee),intake:Math.round(intake),foodDays:fd.length,weighDays:n};
   return {ready:true,tdee:Math.round(tdee),intake:Math.round(intake),rateWk:slope*7,need,target,foodDays:fd.length,weighDays:n};
 }
 function targetDue(){const e=tdeeEstimate(),st=S.settings;if(!e.ready||Math.abs(e.target-st.kcal)<100)return null;
@@ -1511,7 +1569,7 @@ async function estMeal(){
   syncMealHead();const desc=(mealDraft.desc||'').trim();const msg=$('#mealMsg'),go=$('#estGo');
   if(!desc&&!mealFile){msg.textContent='Describe the meal or add a photo first.';return}
   go.disabled=true;msg.classList.remove('err');msg.innerHTML=busy('Estimating…');
-  const prompt=`Estimate the nutrition of a meal for a calorie tracker. The person lives in Barcelona (Spanish supermarkets such as Mercadona, Spanish and European portions) and is a 190 cm, ~80 kg man who lifts.
+  const prompt=`Estimate the nutrition of a meal for a calorie tracker. The person: ${whereText(S.settings)} (local supermarket products and portions), a ${personText(S.settings)}.
 Description: """${desc||'(none, use the photo)'}"""${mealFile?'\nA photo of the meal is attached. Use it to judge what it is and the portion sizes.':''}
 Split it into sensible items. Be realistic rather than optimistic: count cooking oil, sauces and drinks when they're implied. When an amount is given, use it exactly. Round kcal to whole numbers and macros to one decimal.
 Reply with only JSON: {"title":"short meal name","items":[{"name":"Chicken thigh, grilled","amount":"200 g","kcal":350,"protein":48,"carbs":0,"fat":17}],"note":"one short sentence on the biggest uncertainty, or empty string"}`;
@@ -1840,7 +1898,7 @@ async function importHealth(rows){
   }
   return n}
 async function syncOuraSheet(manual){
-  const id=S.settings.ouraSheetId;
+  const id=S.settings.ouraSheetId||(isFriend()?'feed':''); // a friend's Oura and Health come from their own feed
   if(!id||ouraSyncing)return;
   ouraSyncing=true;
   let mcp=null;if(useGas())mcp={callTool:async()=>{if(bootSheet&&Date.now()-bootSheet.at<6e4){const t=bootSheet.text;bootSheet=null;return {payload:{fileContent:t}}}return {payload:{fileContent:(await gas('sheet')).fileContent}}}};else try{mcp=await window.claude.use('mcp')}catch(e){}
@@ -1853,7 +1911,7 @@ async function syncOuraSheet(manual){
     else if(typeof p==='string')text=p;
     else{const b=(r&&r.content||[]).find(x=>x&&x.type==='text');if(b){try{const j=JSON.parse(b.text);text=j.fileContent||b.text}catch(e){text=b.text}}}
     const rows=parseOuraSheetText(text);const dates=Object.keys(rows).sort();
-    if(!dates.length)throw{code:'no_rows'};
+    if(!dates.length&&!isFriend())throw{code:'no_rows'};
     let changed=0;
     for(const d of dates){
       const cur=S.oura[d]||{};const nx={...cur,...rows[d],src:'sheet'};(cur._hand||[]).forEach(k=>{if(k in cur)nx[k]=cur[k];else delete nx[k]}); // keep his hand fixes
@@ -1864,7 +1922,7 @@ async function syncOuraSheet(manual){
     const info={at:Date.now(),days:dates.length,changed,workouts:wN};
     try{localStorage.setItem(OSYNC_KEY,JSON.stringify(info))}catch(e){}
     ouraSyncBad=false;
-    ouraSyncMsg=changed||wN?`Updated ${[changed?changed+' day'+(changed>1?'s':''):'',wN?wN+' workout'+(wN>1?'s':''):''].filter(Boolean).join(' and ')} from your Oura sheet.`:'Already up to date.';
+    ouraSyncMsg=changed||wN?`Updated ${[changed?changed+' day'+(changed>1?'s':''):'',wN?wN+' workout'+(wN>1?'s':''):''].filter(Boolean).join(' and ')}${isFriend()?'':' from your Oura sheet'}.`:'Already up to date.';
     if(manual)toast(ouraSyncMsg);
   }catch(e){
     const c=e&&e.code;ouraSyncBad=true;
@@ -1880,7 +1938,7 @@ async function syncOuraSheet(manual){
   ouraSyncing=false;schedule();setTimeout(maybeDaily,0);
 }
 function ouraSyncLine(){
-  if(!S.settings.ouraSheetId||!ouraSyncBad||ouraSyncing)return '';
+  if(!(S.settings.ouraSheetId||isFriend())||!ouraSyncBad||ouraSyncing)return '';
   const l=lastOuraSync();
   const when=l?new Date(l.at).toLocaleString('en-GB',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}):null;
   return `<div class="row" style="margin-top:10px"><p class="note" style="margin:0;flex:1">${ouraSyncing?busy('Syncing from your Oura sheet…'):esc(ouraSyncMsg||(when?`Auto-synced from your Oura sheet, last ${when}.`:'Linked to your Oura sheet.'))}</p><button class="btn small" data-a="syncOura" hidden${ouraSyncing?' disabled':''}>Sync now</button></div>`;
@@ -1974,7 +2032,7 @@ function callHTML(c){
   if(!callOpen)return `<div class="rel">${head}</div>`;
   return `<div class="rel open">${head}
     <p class="rel-msg">${esc(c.message)}</p>${c.why?`<p class="rel-why">${esc(c.why)}</p>`:''}
-    <div class="rel-act">${AI?'<button class="btn small ink" data-a="openChat">Ask your coach</button>':''}<button class="btn small ink" data-a="callHistory">Past calls</button>${stale&&!dailyBusy?`<button class="btn small ink" data-a="genDaily">Update with this morning’s numbers</button>`:''}${dailyBusy?`<span class="rel-why">${busy('Updating…')}</span>`:''}</div></div>`;
+    <div class="rel-act">${AI||isFriend()?'<button class="btn small ink" data-a="openChat">Ask your coach</button>':''}<button class="btn small ink" data-a="callHistory">Past calls</button>${stale&&!dailyBusy?`<button class="btn small ink" data-a="genDaily">Update with this morning’s numbers</button>`:''}${dailyBusy?`<span class="rel-why">${busy('Updating…')}</span>`:''}</div></div>`;
 }
 function openHistory(){
   const rows=Object.entries(S.coach).sort((a,b)=>b[0].localeCompare(a[0])).slice(0,30);
@@ -1990,15 +2048,15 @@ const md=t=>esc(t).replace(/\*\*(.+?)\*\*/g,'<b>$1</b>').replace(/\n/g,'<br>');
 let chatLive='',chatDraft='';
 function chatLogHTML(){const c=chatLoad();
   const live=chatBusy?`<div class="msg co" id="chatLive">${chatLive?md(chatLive):busy('Reading your logs…')}</div>`:'';
-  return c.length||chatBusy?c.map(m=>`<div class="msg ${m.role==='user'?'me':'co'}">${m.role==='user'?esc(m.content):md(m.content)}</div>`).join('')+live
-    :`<p class="note">Ask anything about your training, food, sleep or the goal. The coach reads your last 30 days, your lift plan and today's numbers before answering.</p>
-      <div class="chips">${['Why is my weight flat this week?','What should I eat after training tonight?','Am I recovering well enough to push legs?','Which lift is lagging?'].map(q=>`<button class="chip" data-a="chatAsk" data-q="${esc(q)}">${esc(q)}</button>`).join('')}</div>`}
+  return c.length||chatBusy?c.map((m,i)=>`<div class="msg ${m.role==='user'?'me':'co'}">${m.role==='user'?esc(m.content):md(m.content)}${m.qa&&!m.miss?`<small class="msg-src">Built-in answer${AI&&i===c.length-1&&!chatBusy?` · <button class="linkbtn" data-a="chatAI">Ask the AI coach instead</button>`:''}</small>`:''}</div>`).join('')+live
+    :`<p class="note">Ask anything about your training, food, sleep or the goal. ${isFriend()||!AI?'Common questions get an instant answer from your own numbers; the AI coach takes the rest.':'The coach reads your last 30 days, your lift plan and today\'s numbers before answering.'}</p>
+      <div class="chips">${(isFriend()||!AI?['How much protein should I eat?','What should I train today?','Should I train today?','Why is my weight flat?','Alternative to bench press']:['Why is my weight flat this week?','What should I eat after training tonight?','Am I recovering well enough to push legs?','Which lift is lagging?']).map(q=>`<button class="chip" data-a="chatAsk" data-q="${esc(q)}">${esc(q)}</button>`).join('')}</div>`}
 const chatBottom=()=>requestAnimationFrame(()=>window.scrollTo(0,document.documentElement.scrollHeight));
 function openChat(){tab='coach';render();chatBottom()}
 function chatContext(){const st=S.settings,t=today(),o=S.oura[t],e=tdeeEstimate();
-  return `You are ${S.settings.name||'your client'}'s personal recomp coach inside his RCMP app. Answer his question from his real data below. Be direct and specific: cite his actual numbers and dates, give concrete amounts (grams, kg, reps, minutes). Short paragraphs, no headings, under 180 words unless he asks for more. If the data can't answer it, say what's missing. Never invent numbers.
-About him: ${st.coachNotes}
-Goal: ${st.goalKg} kg by ${st.goalDate}, lean gain (recomp). Lives in Barcelona (Mercadona). Today is ${t}, ${new Date().toTimeString().slice(0,5)}.
+  return `You are ${st.name||'your client'}'s personal coach inside their RCMP app. Answer their question from their real data below. Be direct and specific: cite their actual numbers and dates, give concrete amounts (grams, kg, reps, minutes). Short paragraphs, no headings, under 180 words unless they ask for more. If the data can't answer it, say what's missing. Never invent numbers. For pain or injury, give general advice and recommend seeing a physio or doctor.
+About them: ${personText(st)}. ${st.experience?'Training experience: '+st.experience+'. ':''}${st.equipment?'Equipment: '+st.equipment+'. ':''}${(st.injuries||[]).length?'Careful with: '+st.injuries.join(', ')+'. ':''}${st.coachNotes||''}
+Goal: ${st.goalKg} kg by ${st.goalDate}, ${goalAI(st)}. ${whereText(st)}. Today is ${t}, ${new Date().toTimeString().slice(0,5)}.
 STATS (exact, computed by the app):
 ${coachStats()}
 Real burn from logs: ${e.ready?`eats ${e.intake} kcal/day, scale ${e.rateWk.toFixed(2)} kg/wk, so burns about ${e.tdee} kcal/day; app suggests ${e.target} kcal for the goal pace`:'not enough fully logged days yet'}.
@@ -2008,11 +2066,18 @@ ${liftPlanText()}
 Today: ${o?'Oura '+ouraBrief(o):'no Oura yet'}. ${foodTodayText(t)}
 LAST 30 DAYS IN DETAIL:
 ${summaryText(30,true)}`}
-async function chatSend(q){
-  if(!AI||chatBusy)return;q=(q||chatDraft||'').trim();if(!q)return;
-  chatLoad().push({role:'user',content:q});chatDraft='';const inp=$('#chatIn');if(inp)inp.value='';chatBusy=true;chatLive='';render();chatBottom();
-  const turns=chat.slice(-10).map(m=>({role:m.role,content:m.content}));while(turns.length&&turns[0].role!=='user')turns.shift();
-  turns[0]={role:'user',content:chatContext()+'\n\nHIS MESSAGE:\n'+turns[0].content};
+const noAnswer=()=>'I don’t have a built-in answer for that one. Try asking about protein, calories, sleep, soreness, a lift (“alternative to bench press”), or what to train today.'+(isFriend()&&ME&&ME.ai&&ME.ai.spent>=ME.ai.cap?' The AI coach’s budget for this month is used up; it resets on the 1st.':'');
+async function chatSend(q,toAI){
+  if(chatBusy)return;
+  if(toAI){const c=chatLoad();if(c.length&&c[c.length-1].qa)c.pop()}
+  else{q=(q||chatDraft||'').trim();if(!q)return;
+    chatLoad().push({role:'user',content:q});chatDraft='';const inp=$('#chatIn');if(inp)inp.value='';
+    // friends (and anyone without Claude) get the built-in answer first; the AI only takes what the rules can't
+    if(isFriend()||!AI){const a=qaAnswer(q);if(a||!AI){chat.push({role:'assistant',content:a||noAnswer(),qa:true,miss:!a});chatSave();render();chatBottom();return}}}
+  if(!AI)return;
+  chatBusy=true;chatLive='';render();chatBottom();
+  const turns=chat.filter(m=>!m.miss).slice(-10).map(m=>({role:m.role,content:m.content}));while(turns.length&&turns[0].role!=='user')turns.shift();
+  turns[0]={role:'user',content:chatContext()+'\n\nTHEIR MESSAGE:\n'+turns[0].content};
   chatCtl=new AbortController();
   try{const r=await AI(turns,{modelTier:'default',cache:false,signal:chatCtl.signal,onText:({text})=>{chatLive=text;const x=$('#chatLive');if(x){x.innerHTML=md(text);chatBottom()}}});
     chat.push({role:'assistant',content:r.text||'(no answer)'});
@@ -2024,8 +2089,9 @@ async function chatSend(q){
 const CALKEY='recomplog.cal';let CAL=null,gymBusy=false,gymErr='';
 function calRows(){if(CAL)return CAL;try{CAL=JSON.parse(localStorage.getItem(CALKEY)||'null')}catch(e){}return CAL||(CAL={rows:[],at:0})}
 function calSet(rows){CAL={rows,at:Date.now()};try{localStorage.setItem(CALKEY,JSON.stringify(CAL))}catch(e){}}
-// his naming: Corehaus = Lagree, Lapso = spin
-function calKind(t){t=String(t||'');return /corehaus|lagree|pilates/i.test(t)?'lagree':/lapso|spin/i.test(t)?'spin':/barry/i.test(t)?'barrys':/\brun\b|running|correr/i.test(t)?'run':/\bgym\b|fitbod/i.test(t)?'gym':null}
+// studio names → kinds come from Setup (settings.classWords, e.g. "corehaus=lagree, lapso=spin")
+function classWords(){return String(S.settings.classWords||'').split(/[,;\n]/).map(x=>x.split('=').map(y=>y.trim().toLowerCase())).filter(([w,k])=>w&&KINDS[k])}
+function calKind(t){t=String(t||'');const lo=t.toLowerCase(),cw=classWords().find(([w])=>lo.includes(w));if(cw)return cw[1];return /corehaus|lagree|pilates/i.test(t)?'lagree':/lapso|spin/i.test(t)?'spin':/barry/i.test(t)?'barrys':/\brun\b|running|correr/i.test(t)?'run':/\bgym\b|fitbod/i.test(t)?'gym':null}
 const hm=s=>{const m=String(s||'').match(/^(\d{1,2}):(\d{2})/);return m?+m[1]*60+ +m[2]:null};
 const hhmmOf=n=>String(Math.floor(n/60)).padStart(2,'0')+':'+String(n%60).padStart(2,'0');
 function workBlock(d){const st=S.settings,dw=parseYmd(d).getDay(),a=hm(st.workStart),b=hm(st.workEnd); // his fixed hours, Mon–Fri
@@ -2096,6 +2162,7 @@ async function genDaily(){const t=today(),c=ruleCall();
 
 // session: the focus most due from his own split, his own lifts, next weights from the lift plan
 function ruleSession(skip=0){
+  if(S.settings.experience)return programSession(skip); // set by onboarding: the built-in program prescribes
   const t=today(),rec=recoveryState(),low=!!(rec&&rec.low);
   const gyms=Object.values(S.workouts).filter(w=>w.kind==='gym'&&(w.exercises||[]).some(e=>e.name)&&w.date>=addDays(t,-45)).sort((a,b)=>b.date.localeCompare(a.date));
   if(!gyms.length)return null;
@@ -2135,7 +2202,7 @@ async function genGymPlan(){
   const want=Math.max(st.gymMin||4,Math.min(5,st.weekly-classes.length));
   const gyms=Object.values(S.workouts).filter(w=>w.kind==='gym'&&w.date>=addDays(t,-30)).sort((a,b)=>a.date.localeCompare(b.date));
   const fo=w=>w.focus||guessFocus((w.exercises||[]).map(e=>e.name))||'Full';
-  const split=[...new Set(gyms.map(fo))];if(!split.length)split.push('Upper','Lower');
+  const split=S.settings.experience?[...new Set(program().days)]:[...new Set(gyms.map(fo))];if(!split.length)split.push('Upper','Lower');
   const lastF={};gyms.forEach(w=>lastF[fo(w)]=w.date);
   const queue=[...split].sort((a,b)=>(lastF[a]||'').localeCompare(lastF[b]||''));
   const cand=days.map(d=>{const fs=freeSlots(d,75),hasClass=calDay(d).some(r=>r.kind&&r.kind!=='gym'),done=workoutsOn(d).some(w=>w.kind==='gym');
@@ -2159,7 +2226,36 @@ const LOCAL_FOODS=[['Chicken breast, raw (pechuga de pollo)',110,23,0,1.5],['Chi
  ['Sweet potato, raw (boniato)',86,1.6,20,0.1],['Bread, wholemeal (pan integral)',247,13,41,3.4],['Banana (plátano)',89,1.1,23,0.3],['Apple (manzana)',52,0.3,14,0.2],
  ['Blueberries (arándanos)',57,0.7,14,0.3],['Olive oil (aceite de oliva)',884,0,0,100],['Butter (mantequilla)',717,0.9,0.1,81],['Avocado (aguacate)',160,2,9,15],
  ['Almonds (almendras)',579,21,22,50],['Peanut butter (crema de cacahuete)',588,25,20,50],['Lentils, cooked (lentejas cocidas)',116,9,20,0.4],
- ['Chickpeas, cooked (garbanzos cocidos)',164,8.9,27,2.6],['Broccoli (brócoli)',34,2.8,7,0.4],['Mozzarella',280,28,3,17],['Cured cheese (queso curado)',400,25,1,33],['Honey (miel)',304,0.3,82,0]]
+ ['Chickpeas, cooked (garbanzos cocidos)',164,8.9,27,2.6],['Broccoli (brócoli)',34,2.8,7,0.4],['Mozzarella',280,28,3,17],['Cured cheese (queso curado)',400,25,1,33],['Honey (miel)',304,0.3,82,0],
+ ['Turkey breast, raw (pechuga de pavo)',105,24,0,1],['Turkey slices, cooked (fiambre de pavo)',100,19,2,1.5],['Pork loin, raw (lomo de cerdo)',143,21,0,6.5],['Pork tenderloin, raw (solomillo de cerdo)',120,21,0,3.5],
+ ['Beef steak, lean, raw (filete de ternera)',130,22,0,4.5],['Beef mince 15% (carne picada 15%)',215,18,0,16],['Burger patty, beef (hamburguesa de vacuno)',250,17,1,20],['Chicken wings, raw (alitas)',200,18,0,14],
+ ['Serrano ham (jamón serrano)',240,31,0,13],['Cooked ham (jamón cocido)',110,19,1,3.5],['Chorizo',455,24,2,39],['Bacon (beicon)',400,14,1,38],['Chicken sausages (salchichas de pollo)',180,13,3,13],
+ ['Cod, raw (bacalao)',82,18,0,0.7],['Hake, raw (merluza)',86,17,0,2],['Sea bass, raw (lubina)',97,18,0,2.5],['Prawns, raw (gambas)',85,19,0,1],['Tuna steak, raw (atún fresco)',130,24,0,4],
+ ['Tuna in olive oil, drained (atún en aceite)',190,26,0,9],['Sardines in oil, drained (sardinas)',210,24,0,12],['Mackerel, raw (caballa)',205,19,0,14],['Smoked salmon (salmón ahumado)',180,22,0,10],
+ ['Mussels, cooked (mejillones)',170,24,7,4.5],['Squid, raw (calamar)',92,16,3,1.4],['Surimi (palitos de cangrejo)',100,8,15,1],
+ ['Tofu, firm (tofu)',145,15,2,8.5],['Tempeh',195,20,8,11],['Seitan',140,25,6,2],['Edamame, shelled (edamame)',121,12,9,5],['Black beans, cooked (alubias negras)',132,9,24,0.5],
+ ['White beans, cooked (alubias blancas)',115,7.5,20,0.5],['Peas (guisantes)',81,5.4,14,0.4],['Hummus',250,8,14,18],['Soy milk, unsweetened (bebida de soja)',33,3.3,0.3,1.8],
+ ['Milk, whole (leche entera)',64,3.2,4.7,3.6],['Milk, skimmed (leche desnatada)',35,3.4,5,0.1],['Lactose-free milk, semi (leche sin lactosa)',46,3.3,4.8,1.6],['Kefir',60,3.5,4.5,3],
+ ['Yogurt, natural (yogur natural)',61,3.5,4.7,3.3],['High-protein yogurt (yogur proteínas)',60,10,4,0.2],['Protein pudding (natillas proteínas)',75,10,6,1],['Quark, low fat (queso quark)',67,12,4,0.2],
+ ['Fresh cheese (queso fresco)',180,12,3,13],['Burgos cheese, light (queso de Burgos 0%)',75,13,4,0.5],['Mozzarella light',165,20,2,9],['Parmesan (parmesano)',400,33,0,29],
+ ['Cheddar',400,25,1.3,33],['Feta',265,14,4,21],['Goat cheese (queso de cabra)',350,22,1,29],['Cream cheese (queso crema)',250,6,4,24],['Egg, boiled (huevo cocido)',155,13,1.1,11],
+ ['Bread, white baguette (barra de pan)',270,9,55,1.5],['Sliced bread (pan de molde)',265,8.5,48,4],['Rye bread (pan de centeno)',250,8.5,48,3.3],['Tortilla wrap, wheat (tortilla de trigo)',310,8.5,51,7.5],
+ ['Rice cakes (tortitas de arroz)',387,8,81,3],['Crackers / crispbread (biscotes)',400,11,72,7],['Pita bread (pan de pita)',275,9,56,1.2],['Bagel',250,10,49,1.5],
+ ['Brown rice, cooked (arroz integral cocido)',123,2.7,26,1],['Basmati rice, raw (arroz basmati)',350,8,77,1],['Quinoa, cooked (quinoa cocida)',120,4.4,21,1.9],['Couscous, cooked (cuscús cocido)',112,3.8,23,0.2],
+ ['Wholemeal pasta, dry (pasta integral)',350,13,64,2.5],['Gnocchi',150,3.5,32,0.5],['Noodles, egg, cooked (fideos)',138,4.5,25,2],['Potatoes, boiled (patata cocida)',87,1.9,20,0.1],
+ ['French fries (patatas fritas)',312,3.4,41,15],['Oven fries (patatas al horno)',160,2.5,25,5],['Corn flakes (copos de maíz)',378,7,84,0.9],['Granola',470,10,64,19],['Muesli',370,10,66,6],
+ ['Orange (naranja)',47,0.9,12,0.1],['Strawberries (fresas)',32,0.7,7.7,0.3],['Grapes (uvas)',69,0.7,18,0.2],['Pear (pera)',57,0.4,15,0.1],['Kiwi',61,1.1,15,0.5],
+ ['Mango',60,0.8,15,0.4],['Pineapple (piña)',50,0.5,13,0.1],['Watermelon (sandía)',30,0.6,7.6,0.2],['Peach (melocotón)',39,0.9,10,0.3],['Raspberries (frambuesas)',52,1.2,12,0.7],
+ ['Dates (dátiles)',282,2.5,75,0.4],['Raisins (pasas)',299,3,79,0.5],['Tomato (tomate)',18,0.9,3.9,0.2],['Cucumber (pepino)',15,0.7,3.6,0.1],['Lettuce (lechuga)',15,1.4,2.9,0.2],
+ ['Spinach (espinacas)',23,2.9,3.6,0.4],['Carrot (zanahoria)',41,0.9,10,0.2],['Onion (cebolla)',40,1.1,9,0.1],['Pepper, red (pimiento rojo)',31,1,6,0.3],['Courgette (calabacín)',17,1.2,3.1,0.3],
+ ['Mushrooms (champiñones)',22,3.1,3.3,0.3],['Green beans (judías verdes)',31,1.8,7,0.2],['Cauliflower (coliflor)',25,1.9,5,0.3],['Aubergine (berenjena)',25,1,6,0.2],['Asparagus (espárragos)',20,2.2,3.9,0.1],
+ ['Sweetcorn (maíz dulce)',86,3.3,19,1.4],['Mixed salad (ensalada)',17,1.2,3,0.2],['Gazpacho',45,1,4,3],['Walnuts (nueces)',654,15,14,65],['Cashews (anacardos)',553,18,30,44],
+ ['Peanuts (cacahuetes)',567,26,16,49],['Pistachios (pistachos)',560,20,28,45],['Chia seeds (semillas de chía)',486,17,42,31],['Dark chocolate 85% (chocolate negro)',600,11,20,52],['Milk chocolate (chocolate con leche)',535,7.5,59,30],
+ ['Jam (mermelada)',250,0.4,60,0.1],['Sugar (azúcar)',400,0,100,0],['Mayonnaise (mayonesa)',680,1,1,75],['Ketchup',110,1.2,26,0.1],['Tomato sauce (tomate frito)',80,1.5,10,3.5],
+ ['Pesto',450,5,6,45],['Soy sauce (salsa de soja)',60,8,6,0.1],['Protein bar (barrita proteica)',360,33,35,12],['Cereal bar (barrita de cereales)',400,6,68,11],['Croissant',406,8,46,21],
+ ['Pizza, margherita (pizza)',250,11,31,9],['Spanish omelette (tortilla de patatas)',190,6.5,14,12],['Paella',160,8,22,4.5],['Lentil stew (lentejas guisadas)',110,7,14,3],
+ ['Orange juice (zumo de naranja)',45,0.7,10,0.2],['Cola',42,0,10.6,0],['Beer (cerveza)',43,0.5,3.6,0],['Wine, red (vino tinto)',85,0.1,2.6,0],['Oat drink (bebida de avena)',45,0.5,7,1.5],
+ ['Coconut oil (aceite de coco)',862,0,0,100],['Sunflower oil (aceite de girasol)',884,0,0,100]]
  .map(([name,k,p,c,f])=>({name,brand:'',k,p,c,f,local:1}));
 let FS=[],fsT=null,fsPick=null;
 const fold=s=>String(s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
@@ -2201,7 +2297,7 @@ function reviewCard(){const L=latestReview();if(!L)return '';const wd=parseYmd(t
   if(fresh)return `<section class="card review"><div class="card-h"><h2>${esc(L.r.headline)}</h2><span class="aside">Sunday review</span></div>${reviewHTML(L.r,true)}<div class="actions"><button class="btn small ghost" data-a="openReviews">Past reviews</button></div></section>`;
   return (L.r.focus||[]).length?`<section class="card focus"><div class="card-h"><h2>This week’s focus</h2><button class="btn small ghost" data-a="openReviews">Review</button></div>${focusList(L.r)}</section>`:''}
 function openReviews(){const ks=Object.keys(S.reviews||{}).filter(isDate).sort().reverse();
-  openSheet(head('Weekly reviews')+(useGas()?`<div class="actions" style="margin:0 0 12px"><button class="btn" data-a="runReview" id="rvGo">Run this week’s review now</button></div><p class="note" id="rvMsg" style="margin:-4px 0 10px"></p>`:'')+
+  openSheet(head('Weekly reviews')+(useGas()&&!isFriend()?`<div class="actions" style="margin:0 0 12px"><button class="btn" data-a="runReview" id="rvGo">Run this week’s review now</button></div><p class="note" id="rvMsg" style="margin:-4px 0 10px"></p>`:'')+
     (ks.length?ks.map((k,i)=>`<details class="more"${i===0?' open':''}><summary>${fmtDay(k)} · ${esc(S.reviews[k].headline)}</summary>${reviewHTML(S.reviews[k],true)}</details>`).join(''):'<p class="empty">The first review arrives Sunday evening. It reads your week and your newest photos, then sets up to 3 things to focus on.</p>'))}
 async function runReview(){const b=$('#rvGo'),m=$('#rvMsg');if(b){b.disabled=true;b.innerHTML=busy('Reading your week and photos… about a minute')}
   try{const r=await gas('review');S.reviews[r.review.week]=r.review;dataVer++;saveLocal();openReviews();toast('Review ready')}catch(e){if(m)m.textContent=aiErr(e)||e.message||'The review failed. Try again.';if(b){b.disabled=false;b.textContent='Run this week’s review now'}}}
@@ -2239,14 +2335,14 @@ function buildShop(meals,days){const acc={};
 async function genPlan(note){
   if(!AI||planBusy)return;planBusy=true;planErr='';planProg='';const wk=planWeek(),st=S.settings;openPlan();render();
   const tr=[...Array(14)].map((_,i)=>addDays(mondayOf(today()),-1-i)).map(d=>[DOW[(parseYmd(d).getDay()+6)%7],workoutsOn(d).filter(w=>w.kind!=='walk').map(w=>(KINDS[w.kind]||KINDS.other).label)]).filter(x=>x[1].length).map(x=>x[0]+': '+x[1].join('+')).join('; ');
-  const prompt=`You are his nutrition coach. Plan his meals for the week starting Monday ${wk}.
-About him: ${st.coachNotes}
-Daily targets ${st.kcal} kcal, ${st.protein} g protein, ${st.carbs} g carbs, ${st.fat} g fat (each day within ±5% kcal, protein at or above target). Lean gain. Lives in Barcelona, shops at Mercadona.
-Meals he eats often (keep favourites in): ${favMealsText()}.
-His training days lately: ${tr||'unknown'}. More carbs on training days.
-${note?`His wishes this week: "${note}"`:''}
+  const prompt=`You are their nutrition coach. Plan their meals for the week starting Monday ${wk}.
+About them: ${personText(st)}. ${st.coachNotes||''}
+Daily targets ${st.kcal} kcal, ${st.protein} g protein, ${st.carbs} g carbs, ${st.fat} g fat (each day within ±5% kcal, protein at or above target). Goal: ${goalAI(st)}. ${whereText(st)}.
+Meals they eat often (keep favourites in): ${favMealsText()}.
+Their training days lately: ${tr||'unknown'}. More carbs on training days.
+${note?`Their wishes this week: "${note}"`:''}
 Rules: exactly 6 distinct meals (2 breakfasts, 2 lunch/dinner mains, 1 snack, 1 extra main), reused across the week; at most 5 ingredients each; realistic macros including cooking oil.
-For each ingredient: g = grams per serving, buy = the Mercadona product to buy (Spanish name), aisle (Carne y pescado, Frutas y verduras, Lácteos y huevos, Despensa, Congelados, Panadería, Otros), pack = its pack size label, packG = grams in one pack.
+For each ingredient: g = grams per serving, buy = the ${shopName()} product to buy (in the shop's language), aisle (Carne y pescado, Frutas y verduras, Lácteos y huevos, Despensa, Congelados, Panadería, Otros), pack = its pack size label, packG = grams in one pack.
 week = 7 days (Mon..Sun), each [Breakfast, Lunch, Snack, Dinner] as meal ids.
 Reply with only compact JSON, no extra text:
 {"meals":{"m1":{"title":"Overnight oats with whey","items":[{"name":"Oats","g":100,"kcal":370,"protein":13,"carbs":60,"fat":7,"buy":"Copos de avena Hacendado","aisle":"Despensa","pack":"1 kg","packG":1000}]}},"week":[["m1","m3","m5","m4"]],"prep":["Sunday: grill 1.4 kg chicken, cook 600 g rice"]}`;
@@ -2264,7 +2360,7 @@ function planToday(){const p=S.plans[mondayOf(today())];if(!p||!Array.isArray(p.
 function openPlan(tabSel){
   const p=S.plans[planWeek()]||S.plans[mondayOf(today())];if(tabSel)planTab=tabSel;
   const body=planBusy?`<p class="note">${busy('<span id="planProg">'+(planProg||'Planning your week…')+'</span>')}</p><p class="note">You can close this; the plan lands on Progress › Food when it’s ready.</p>`
-    :!p?`<p class="note">A week of meals built on your ${S.settings.kcal} kcal and ${S.settings.protein} g protein targets and the meals you already eat, plus a Mercadona list grouped by aisle.</p>
+    :!p?`<p class="note">A week of meals built on your ${S.settings.kcal} kcal and ${S.settings.protein} g protein targets and the meals you already eat, plus a ${esc(shopName())} list grouped by aisle.</p>
       <label>Anything for this week? (optional)<input id="planNote" placeholder="e.g. no fish, cheap week, eating out Saturday"></label>
       ${planErr?`<p class="note err">${esc(planErr)}</p>`:''}${AI?'<div class="actions"><button class="btn primary" data-a="genPlan">Plan the week</button></div>':''}`
     :planTab==='shop'?shopHTML(p):planDaysHTML(p);
@@ -2280,7 +2376,7 @@ function planDaysHTML(p){const ti=p.week===mondayOf(today())?(parseYmd(today()).
 function shopHTML(p){const g={};(p.shop||[]).forEach((x,i)=>{const a=x.aisle||'Otros';(g[a]=g[a]||[]).push([x,i])});const got=p.got||{},n=(p.shop||[]).length,nG=Object.values(got).filter(Boolean).length;
   return `<p class="note">${nG} of ${n} in the basket</p>${Object.entries(g).map(([a,xs])=>`<h3 class="shop-a">${esc(a)}</h3><ul class="shop">${xs.map(([x,i])=>`<li><button class="shop-i${got[i]?' on':''}" data-a="shopTick" data-w="${p.week}" data-i="${i}" aria-pressed="${!!got[i]}"><span class="todo-box" aria-hidden="true">${got[i]?'<svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>':''}</span><span>${esc(x.item)}</span><small>${esc(x.qty||'')}</small></button></li>`).join('')}</ul>`).join('')}
     <div class="actions"><button class="btn" data-a="shopCopy" data-w="${p.week}">Copy list</button></div>`}
-const shopText=p=>{const g={};(p.shop||[]).forEach(x=>{const a=x.aisle||'Otros';(g[a]=g[a]||[]).push(x)});return `Mercadona, week of ${p.week}\n`+Object.entries(g).map(([a,xs])=>`\n${a}\n`+xs.map(x=>`- ${x.item}${x.qty?' ('+x.qty+')':''}`).join('\n')).join('\n')};
+const shopText=p=>{const g={};(p.shop||[]).forEach(x=>{const a=x.aisle||'Otros';(g[a]=g[a]||[]).push(x)});return `${shopName()}, week of ${p.week}\n`+Object.entries(g).map(([a,xs])=>`\n${a}\n`+xs.map(x=>`- ${x.item}${x.qty?' ('+x.qty+')':''}`).join('\n')).join('\n')};
 function planLog(wk,sl,i){const p=S.plans[wk];if(!p)return;const m=p.meals[p.days[i].slots[sl]];if(!m)return;
   mealDraft={at:hhmm(),date:today(),slot:sl,title:String(m.title||''),desc:'',note:'From this week’s plan',items:(m.items||[]).map(it=>({name:String(it.name||'Item'),amount:it.amount?String(it.amount):'',kcal:num(it.kcal),protein:num(it.protein),carbs:num(it.carbs),fat:num(it.fat)}))};
   sel=today();sheetDirty=true;renderMeal()}
@@ -2346,7 +2442,7 @@ function logSuggest(){
 async function openCoach(){
   openSheet(head('Coach read-out')+`<div class="coach-out" id="coachOut">${busy('Thinking…')}</div><div class="actions"><button class="btn" data-a="stopCoach" id="coachStop">Stop</button></div>`);
   const out=$('#coachOut');coachCtl=new AbortController();
-  const prompt=`You are a sharp, practical strength and nutrition coach reviewing an athlete's own training log. Be direct and specific, like a good personal trainer texting him.
+  const prompt=`You are a sharp, practical strength and nutrition coach reviewing an athlete's own training log. Be direct and specific, like a good personal trainer texting them.
 Write a short read-out:
 - What's going well: 1–2 points, with numbers from the log.
 - What needs attention: 1–3 points with numbers (protein and calorie gaps, energy balance against Oura burn when present, pace toward the weight goal, missed sessions, stalled or dropping lifts, sleep or readiness trends).
@@ -2391,6 +2487,418 @@ async function restore(file){
   if(j.settings)await safe(()=>saveSettings({...clean(DEFAULTS),...j.settings}));setDraft=null;
   toast(`Restored ${n} entries`);schedule();
 }
+
+/* ---------- knowledge base: exercises, programs and the program engine (no AI) ---------- */
+// [name, pattern, main muscles, equipment (g gym, d dumbbells at home, b bodyweight), go easy with (B lower back, K knees, S shoulders), cue]
+const EXERCISES=[
+ ['Back Squat','squat','quads, glutes','g','BK','Brace hard, sit between your heels, knees track over toes, drive up through the whole foot.'],
+ ['Smith Machine Squat','squat','quads, glutes','g','K','Feet slightly forward of the bar, sit straight down, keep your chest up.'],
+ ['Hack Squat','squat','quads','g','K','Back flat on the pad, go as deep as your heels stay down, push through mid-foot.'],
+ ['Leg Press','squat','quads, glutes','g','K','Lower until your hips are about to tuck, don’t lock the knees at the top.'],
+ ['Front Squat','squat','quads, upper back','g','BK','Elbows high, stay upright, sit down between your knees.'],
+ ['Belt Squat','squat','quads, glutes','g','K','Load hangs from the hips, so the back rests: sit deep and stand tall.'],
+ ['Goblet Squat','squat','quads, glutes','gd','K','Hold the weight at your chest, elbows inside the knees at the bottom.'],
+ ['Heel-Elevated Goblet Squat','squat','quads','gd','K','Heels on a plate or book, torso upright, slow on the way down.'],
+ ['Dumbbell Squat','squat','quads, glutes','gd','K','Dumbbells at your sides, sit back and down, chest proud.'],
+ ['Bodyweight Squat','squat','quads, glutes','gdb','K','Arms forward for balance, full depth, 2 seconds down.'],
+ ['Tempo Squat','squat','quads, glutes','gdb','K','3 seconds down, 1 second pause, stand up: bodyweight gets hard fast.'],
+ ['Wall Sit','squat','quads','gdb','K','Thighs parallel, back flat on the wall, hold.'],
+ ['Deadlift','hinge','hamstrings, glutes, back','g','B','Bar over mid-foot, lats tight, push the floor away, hips and shoulders rise together.'],
+ ['Trap Bar Deadlift','hinge','glutes, quads, back','g','B','Stand in the middle, chest up, drive through the floor.'],
+ ['Romanian Deadlift','hinge','hamstrings, glutes','g','B','Soft knees, push the hips back, bar stays on the legs, stop when the hamstrings stretch.'],
+ ['Dumbbell Romanian Deadlift','hinge','hamstrings, glutes','gd','B','Hips back, dumbbells slide down the thighs, flat back, squeeze glutes to stand.'],
+ ['Single-Leg Romanian Deadlift','hinge','hamstrings, glutes','gdb','','Reach the free leg back, hips square, hold something for balance if needed.'],
+ ['Good Morning','hinge','hamstrings, lower back','g','B','Bar on the back, soft knees, hinge until the hamstrings stretch, light weight only.'],
+ ['Back Extension','hinge','glutes, lower back','g','','Hinge from the hips, round nothing, squeeze the glutes at the top.'],
+ ['Cable Pull Through','hinge','glutes, hamstrings','g','','Face away from the cable, hinge back, snap the hips through.'],
+ ['Kettlebell Swing','hinge','glutes, hamstrings','gd','B','A hip snap, not a squat or a lift: the arms just hold on.'],
+ ['Hip Hinge Hold','hinge','hamstrings, glutes','gdb','','Hands on hips, push them back to a stretch, hold 3 seconds, stand.'],
+ ['Bulgarian Split Squat','lunge','quads, glutes','gd','K','Back foot on a bench, most weight on the front leg, go straight down.'],
+ ['Walking Lunge','lunge','quads, glutes','gd','K','Long steps, back knee kisses the floor, torso tall.'],
+ ['Reverse Lunge','lunge','glutes, quads','gdb','','Step back, front shin stays vertical: the knee-friendly lunge.'],
+ ['Dumbbell Step Up','lunge','quads, glutes','gd','K','Whole foot on the box, push through the heel, control the way down.'],
+ ['Split Squat','lunge','quads, glutes','gdb','K','Feet apart like a long stride, drop the back knee straight down.'],
+ ['Smith Machine Split Squat','lunge','quads, glutes','g','K','Front foot well forward, the bar keeps you balanced.'],
+ ['Lateral Lunge','lunge','adductors, glutes','gdb','K','Step wide, sit into one hip, other leg straight.'],
+ ['Barbell Hip Thrust','glute','glutes','g','','Upper back on the bench, chin tucked, ribs down, pause and squeeze at the top.'],
+ ['Dumbbell Hip Thrust','glute','glutes','gd','','Dumbbell on the hips, drive up until the body is a straight line.'],
+ ['Glute Bridge','glute','glutes','gdb','','Back on the floor, heels close, push hips up, 2 second squeeze.'],
+ ['Single-Leg Glute Bridge','glute','glutes','gdb','','One foot planted, keep the hips level as you rise.'],
+ ['Cable Kickback','glute','glutes','g','','Hinge slightly, kick back without arching the lower back.'],
+ ['Hip Abduction Machine','glute','side glutes','g','','Lean slightly forward, push the knees out, slow return.'],
+ ['Leg Extension','quad','quads','g','K','Pad on the lower shin, squeeze the top for a second, slow down.'],
+ ['Sissy Squat','quad','quads','gdb','K','Hold on, knees forward, lean back as one line. Small range at first.'],
+ ['Seated Leg Curl','ham','hamstrings','g','','Lean forward a little, curl all the way, 2 seconds back up.'],
+ ['Lying Leg Curl','ham','hamstrings','g','','Hips pressed down, curl to the glutes, don’t let the weight drop.'],
+ ['Nordic Curl','ham','hamstrings','gdb','','Feet anchored, lower as slowly as you can, push back up with the hands.'],
+ ['Slider Leg Curl','ham','hamstrings','gdb','','Bridge up on towels or socks, slide the heels in and out, hips stay up.'],
+ ['Dumbbell Leg Curl','ham','hamstrings','gd','','Lie face down, dumbbell between the feet, curl slowly.'],
+ ['Standing Calf Raise','calf','calves','g','','Full stretch at the bottom, pause, then all the way up on the big toe.'],
+ ['Seated Calf Raise','calf','calves','g','','Slow and full range: calves respond to the stretch.'],
+ ['Dumbbell Calf Raise','calf','calves','gd','','On a step, dumbbell in one hand, the other holds on.'],
+ ['Single-Leg Calf Raise','calf','calves','gdb','','On a step, pause 2 seconds at the bottom of each rep.'],
+ ['Leg Press Calf Raise','calf','calves','g','','Balls of the feet on the edge of the plate, knees soft.'],
+ ['Barbell Bench Press','hpush','chest, triceps, front delts','g','S','Shoulder blades pinched, feet planted, bar to the lower chest, press up and back.'],
+ ['Smith Machine Bench Press','hpush','chest, triceps','g','S','Bar to the lower chest, elbows about 45° from the body.'],
+ ['Dumbbell Bench Press','hpush','chest, triceps','gd','','Elbows 45°, dumbbells down to chest level, press up and slightly in.'],
+ ['Incline Dumbbell Bench Press','hpush','upper chest, front delts','gd','','Bench at 30°, lower to the upper chest, press up.'],
+ ['Incline Barbell Bench Press','hpush','upper chest','g','S','Bench at 30°, bar to just below the collarbone.'],
+ ['Smith Machine Incline Bench Press','hpush','upper chest','g','','Bench at 30° under the bar, touch the upper chest, press.'],
+ ['Machine Chest Press','hpush','chest, triceps','g','','Handles at mid-chest, press without locking out hard.'],
+ ['Floor Press','hpush','chest, triceps','gd','','Lying on the floor, elbows touch down softly, press: easy on the shoulders.'],
+ ['Close-Grip Bench Press','hpush','triceps, chest','g','S','Hands shoulder width, elbows tucked, bar to the lower chest.'],
+ ['Push Up','hpush','chest, triceps','gdb','','Body in one line, chest to a fist from the floor, elbows 45°.'],
+ ['Incline Push Up','hpush','chest, triceps','gdb','','Hands on a bench or table: easier, same form as a push up.'],
+ ['Decline Push Up','hpush','upper chest, shoulders','gdb','S','Feet up on a chair, keep the body straight.'],
+ ['Chest Dip','hpush','lower chest, triceps','g','S','Lean forward, lower until the shoulders are level with the elbows.'],
+ ['Overhead Press','vpush','shoulders, triceps','g','BS','Glutes tight, bar from the collarbone straight up, head through at the top.'],
+ ['Seated Dumbbell Shoulder Press','vpush','shoulders, triceps','gd','S','Back on the pad, dumbbells from ear level to just above the head.'],
+ ['Arnold Press','vpush','shoulders','gd','S','Palms face you at the bottom, rotate out as you press.'],
+ ['Machine Shoulder Press','vpush','shoulders','g','','Handles at shoulder height, press without shrugging.'],
+ ['Landmine Press','vpush','shoulders, upper chest','g','','Press the bar end up and forward: the shoulder-friendly press.'],
+ ['Half-Kneeling Dumbbell Press','vpush','shoulders, core','gd','','One knee down, squeeze that glute, press one dumbbell up.'],
+ ['Pike Push Up','vpush','shoulders, triceps','gdb','S','Hips high, lower the head between the hands.'],
+ ['Barbell Row','hpull','upper back, lats','g','B','Hinge to about 45°, pull the bar to the belly, no jerking.'],
+ ['Dumbbell Row','hpull','lats, upper back','gd','','Hand and knee on a bench, pull the dumbbell to the hip.'],
+ ['Seated Cable Row','hpull','upper back, lats','g','','Sit tall, pull to the belly, squeeze the shoulder blades together.'],
+ ['Chest-Supported Dumbbell Row','hpull','upper back','gd','','Chest on an incline bench, pull with the elbows: no lower-back strain.'],
+ ['T-Bar Row','hpull','upper back, lats','g','B','Chest up, flat back, pull to the chest.'],
+ ['Machine Row','hpull','upper back','g','','Chest on the pad, pull the elbows back, pause.'],
+ ['Inverted Row','hpull','upper back, biceps','gb','','Under a bar or sturdy table, body straight, pull the chest up.'],
+ ['Doorframe Row','hpull','upper back, biceps','gdb','','Hold a doorframe, lean back, pull yourself in. Walk the feet in to make it harder.'],
+ ['Pull Up','vpull','lats, biceps','gdb','','Needs a bar. Start from a dead hang, chest to the bar, no swinging.'],
+ ['Chin Up','vpull','lats, biceps','gdb','','Palms facing you, pull the chin over the bar, control the way down.'],
+ ['Lat Pulldown','vpull','lats','g','','Lean back slightly, pull the bar to the upper chest, elbows down and in.'],
+ ['Assisted Pull Up','vpull','lats, biceps','g','','Use the machine or a band, full range every rep.'],
+ ['Close-Grip Lat Pulldown','vpull','lats','g','','Neutral grip handle, pull to the chest, stretch at the top.'],
+ ['Straight-Arm Pulldown','vpull','lats','g','','Arms long, sweep the bar to the thighs, feel the lats.'],
+ ['Dumbbell Pullover','vpull','lats, chest','gd','S','Lying across a bench, lower behind the head on a soft elbow, pull back over.'],
+ ['Cable Fly','chestiso','chest','g','','Slight elbow bend, hug a big tree, squeeze.'],
+ ['Pec Deck','chestiso','chest','g','','Elbows at chest height, squeeze the handles together, slow return.'],
+ ['Dumbbell Fly','chestiso','chest','gd','S','Wide arc, stop when you feel the stretch, not deeper.'],
+ ['Low-to-High Cable Fly','chestiso','upper chest','g','','From low pulleys, sweep up to eye level.'],
+ ['Dumbbell Lateral Raise','sidedelt','side delts','gd','','Lead with the elbows, raise to shoulder height, no swinging.'],
+ ['Cable Lateral Raise','sidedelt','side delts','g','','Cable behind you, raise out to the side, 2 seconds down.'],
+ ['Machine Lateral Raise','sidedelt','side delts','g','','Pads on the outer arm, raise to shoulder level.'],
+ ['Lean-Away Lateral Raise','sidedelt','side delts','gd','','Hold a post, lean out, raise the free arm: bigger stretch.'],
+ ['Upright Row','sidedelt','side delts, traps','g','S','Wide grip, elbows lead, only to chest height.'],
+ ['Face Pull','reardelt','rear delts, upper back','g','','Rope at face height, pull to the eyes, thumbs point back.'],
+ ['Reverse Pec Deck','reardelt','rear delts','g','','Face the pad, sweep the arms back, pinky leads.'],
+ ['Dumbbell Rear Delt Fly','reardelt','rear delts','gd','','Hinge forward, small bend in the elbows, raise out to the side.'],
+ ['Prone Y Raise','reardelt','rear delts, lower traps','gdb','','Face down on an incline bench or the floor, raise the arms in a Y.'],
+ ['Barbell Curl','biceps','biceps','g','','Elbows pinned, curl without swinging, slow down.'],
+ ['EZ Bar Curl','biceps','biceps','g','','Angled grip is easier on the wrists; elbows stay still.'],
+ ['Dumbbell Curl','biceps','biceps','gd','','Turn the palm up as you curl, squeeze at the top.'],
+ ['Hammer Curl','biceps','biceps, forearms','gd','','Palms facing in, curl to the shoulder.'],
+ ['Incline Dumbbell Curl','biceps','biceps','gd','','Lie back on an incline, arms hang: the stretch does the work.'],
+ ['Cable Curl','biceps','biceps','g','','Constant tension: elbows still, full stretch at the bottom.'],
+ ['Preacher Curl','biceps','biceps','g','','Armpits on the pad, lower all the way, curl up.'],
+ ['Concentration Curl','biceps','biceps','gd','','Elbow on the inner thigh, slow and strict.'],
+ ['Tricep Pushdown','triceps','triceps','g','','Elbows at your sides, push down to straight arms, squeeze.'],
+ ['Overhead Cable Tricep Extension','triceps','triceps (long head)','g','','Face away from the cable, elbows by the ears, extend.'],
+ ['Skull Crusher','triceps','triceps','g','S','Lower the bar to the forehead or just behind, elbows still.'],
+ ['Dumbbell Overhead Tricep Extension','triceps','triceps','gd','','One dumbbell in both hands behind the head, extend up.'],
+ ['Dumbbell Kickback','triceps','triceps','gd','','Upper arm parallel to the floor, straighten the elbow fully.'],
+ ['Diamond Push Up','triceps','triceps, chest','gdb','','Hands close under the chest, elbows brush the ribs.'],
+ ['Bench Dip','triceps','triceps','gdb','S','Hands on a bench behind you, lower to a 90° elbow.'],
+ ['Plank','core','core','gdb','','Elbows under shoulders, squeeze glutes and abs, breathe.'],
+ ['Side Plank','core','obliques','gdb','','Hips high, body in one line.'],
+ ['Dead Bug','core','deep core','gdb','','Lower back pressed down, opposite arm and leg reach out slowly.'],
+ ['Bird Dog','core','core, lower back','gdb','','On all fours, reach opposite arm and leg, hips stay level.'],
+ ['Hollow Hold','core','abs','gdb','','Lower back glued down, arms and legs long.'],
+ ['Hanging Leg Raise','core','abs, hip flexors','g','','No swinging: curl the pelvis up, lower slowly.'],
+ ['Cable Crunch','core','abs','g','','Kneel, rope by the head, crunch the ribs to the hips.'],
+ ['Ab Wheel Rollout','core','abs','g','B','Ribs down, roll out only as far as the back stays flat.'],
+ ['Pallof Press','core','obliques','g','','Stand side-on to a cable, press out and resist the twist.'],
+ ['Reverse Crunch','core','lower abs','gdb','','Curl the hips off the floor, slow down.'],
+ ['Crunch','core','abs','gdb','','Ribs to hips, chin off the chest, small range.'],
+ ["Farmer's Carry",'carry','grip, traps, core','gd','','Heavy dumbbells, tall posture, walk 30–40 m.'],
+ ['Suitcase Carry','carry','obliques, grip','gd','','One heavy dumbbell, don’t lean, walk.']
+].map(([name,pat,mus,eq,avoid,cue])=>({name,pat,mus,eq,avoid,cue}));
+const EX_BY=Object.fromEntries(EXERCISES.map(e=>[e.name.toLowerCase(),e]));
+const EX_INJ={back:'B',knee:'K',shoulder:'S'};
+// a slot is [pattern, sets, low reps, high reps, which pick]
+const DAYS={
+  'Full body A':[['squat',3,6,10],['hpush',3,6,10],['hpull',3,8,12],['hinge',2,8,10],['sidedelt',2,12,15],['core',2,10,15]],
+  'Full body B':[['hinge',3,6,10],['vpush',3,6,10],['vpull',3,6,10],['lunge',2,8,12],['biceps',2,10,12],['triceps',2,10,12]],
+  'Full body C':[['lunge',3,8,12],['hpush',3,8,12,1],['hpull',3,8,12,1],['glute',3,8,12],['reardelt',2,12,15],['core',2,10,15]],
+  'Upper A':[['hpush',3,6,10],['hpull',3,6,10],['vpush',3,8,10],['vpull',3,8,12],['sidedelt',3,12,15],['triceps',2,10,12],['biceps',2,10,12]],
+  'Upper B':[['hpush',3,8,12,1],['vpull',3,6,10,1],['hpull',3,8,12,1],['chestiso',2,12,15],['reardelt',2,12,15],['biceps',2,10,12,1],['triceps',2,10,12,1]],
+  'Lower A':[['squat',3,6,10],['hinge',3,8,10],['lunge',2,8,12],['ham',2,10,12],['calf',3,10,15],['core',2,10,15]],
+  'Lower B':[['hinge',3,6,8,1],['squat',3,10,12,1],['glute',3,8,12],['quad',2,12,15],['calf',3,10,15,1],['core',2,10,15,1]],
+  'Arms and shoulders':[['vpush',3,8,12,1],['sidedelt',3,12,15,1],['reardelt',2,12,15],['biceps',3,8,12],['triceps',3,8,12],['chestiso',2,12,15,1]],
+  'Push':[['hpush',3,6,10],['vpush',3,8,10],['hpush',3,8,12,1],['chestiso',2,12,15],['sidedelt',3,12,15],['triceps',3,10,12]],
+  'Pull':[['vpull',3,6,10],['hpull',3,8,12],['hpull',2,10,12,1],['reardelt',3,12,15],['biceps',3,8,12],['biceps',2,10,12,1]],
+  'Legs':[['squat',3,6,10],['hinge',3,8,10],['lunge',2,8,12],['ham',2,10,12],['calf',3,10,15],['core',2,10,15]]
+};
+const PROGRAMS={
+  2:{name:'Full body, 2 days',days:['Full body A','Full body B']},
+  3:{name:'Full body, 3 days',days:['Full body A','Full body B','Full body C']},
+  4:{name:'Upper / lower, 4 days',days:['Upper A','Lower A','Upper B','Lower B']},
+  5:{name:'Upper / lower + arms, 5 days',days:['Upper A','Lower A','Arms and shoulders','Upper B','Lower B']},
+  6:{name:'Push / pull / legs, 6 days',days:['Push','Pull','Legs','Push','Pull','Legs']}
+};
+const EXPERIENCE={new:'New to lifting',lt1:'Under a year',y13:'1–3 years',y3:'3+ years'};
+const EQUIPMENT={gym:'Full gym',dumbbells:'Home, dumbbells',bodyweight:'Bodyweight only'};
+function program(st=S.settings){const n=Math.max(2,Math.min(6,Math.round(num(st.gymMin)||num(st.weekly)||3)));
+  // new lifters do full body up to 3 days; a 4th or 5th day stays full body too
+  const p=st.experience==='new'&&n>3?{name:`Full body, ${n} days`,days:['Full body A','Full body B','Full body C','Full body A','Full body B'].slice(0,n)}:PROGRAMS[n];
+  return {...p,n}}
+const eqOK=(e,st)=>e.eq.includes(st.equipment==='bodyweight'?'b':st.equipment==='dumbbells'?'d':'g');
+function exOptions(pat,st=S.settings){const inj=(st.injuries||[]).map(k=>EX_INJ[k]).filter(Boolean),idx=exerciseIndex();
+  const list=EXERCISES.filter(e=>e.pat===pat&&eqOK(e,st));const safe=list.filter(e=>!inj.some(f=>e.avoid.includes(f)));
+  const use=safe.length?safe:list;const done=e=>(idx[e.name.toLowerCase()]||{rows:[]}).rows.length;
+  return use.map((e,i)=>({e,i,n:done(e)})).sort((a,b)=>(b.n>0)-(a.n>0)||b.n-a.n||a.i-b.i).map(x=>x.e)}
+function exAlternatives(name,st=S.settings){const e=EX_BY[String(name).toLowerCase()];if(!e)return [];return exOptions(e.pat,st).filter(x=>x!==e)}
+const SET_ADJ={new:-1,lt1:0,y13:0,y3:1};
+function programDay(skip=0){const st=S.settings,t=today(),p=program(st),since=st.programStart||addDays(t,-28);
+  const planned=gymPlanFor(t)[0],pi=planned?p.days.indexOf(planned.focus):-1;
+  const done=new Set(Object.values(S.workouts).filter(w=>w.kind==='gym'&&w.date>=since&&w.date<t).map(w=>w.date)).size;
+  const i=((pi>=0?pi:done)+skip)%p.days.length;return {p,i,name:p.days[i],planned:pi>=0&&skip===0}}
+function programSession(skip=0){
+  const st=S.settings,rec=recoveryState(),low=!!(rec&&rec.low),{p,i,name,planned}=programDay(skip);
+  const plan=Object.fromEntries(liftPlan().map(l=>[l.name.toLowerCase(),l])),used=new Set(),adj=SET_ADJ[st.experience]||0;
+  const ex=DAYS[name].map(([pat,sets,lo,hi,pick],k)=>{const opts=exOptions(pat,st).filter(e=>!used.has(e.name));if(!opts.length)return null;
+    const e=opts[Math.min(pick||0,opts.length-1)];used.add(e.name);
+    const l=plan[e.name.toLowerCase()],n0=Math.max(2,Math.min(5,sets+(k<2?adj:Math.min(0,adj))))-(low?1:0);
+    const w=l?(low?l.top:l.next.w):null,r=l?(low?l.lo:l.next.r):lo;
+    return {name:e.name,sets:[...Array(n0)].map(()=>({reps:r,kg:w==null?null:Math.round(w*4)/4})),rest:k<2&&/squat|hinge|hpush|vpush|hpull|vpull|lunge/.test(pat)?'2–3 min':'90 s',
+      note:(l?(low?'recovery is low: hold the weight':l.why)+' · ':`aim for ${lo}–${hi} reps, stop 1–2 short of failure · `)+e.cue}}).filter(Boolean);
+  return {focus:name,mins:Math.min(80,ex.length*9+10),program:p.name,why:`Day ${i+1} of ${p.days.length} in your ${p.name.toLowerCase()} program${planned?', on today’s plan':''}.${low?' HRV is under your normal, so weights hold and one set comes off.':''}`,
+    warmup:'5 min easy cardio, then 2 light ramp-up sets of the first exercise.',exercises:ex}}
+function programCard(){const st=S.settings;if(!st.experience)return '';const p=program(st),{i}=programDay(0);
+  return `<section class="card"><div class="card-h"><h2>Your program</h2><span class="aside">${esc(EQUIPMENT[st.equipment]||'')}</span></div>
+    <p class="note" style="margin:0 0 6px">${esc(p.name)}. Weights go up when you hit the top of the rep range on every set (double progression).</p>
+    <ul class="list">${p.days.map((d,k)=>{const used=new Set(),names=DAYS[d].map(([pat,,,,pick])=>{const o=exOptions(pat,st).filter(e=>!used.has(e.name));const e=o[Math.min(pick||0,o.length-1)];if(e)used.add(e.name);return e?e.name:''}).filter(Boolean);
+      return `<li class="item"><div class="body"><div class="t">${k===i?'<span class="badge" style="background:var(--good)">Next</span>':''}${esc(d)}</div><div class="s">${esc(names.join(' · '))}</div></div></li>`}).join('')}</ul>
+    <div class="actions"><button class="btn small" data-a="openSuggest" data-k="session">Today’s session</button></div></section>`}
+
+/* ---------- built-in coach answers: intent rules with the user's own numbers (no AI) ---------- */
+function qaNums(){const st=S.settings,t=today(),y=addDays(t,-1),rng=(e,n)=>[...Array(n)].map((_,i)=>addDays(e,-i));
+  const fd=rng(y,7).filter(d=>dayTotals(d).kcal>=st.kcal*.5),ft=fd.map(dayTotals),a=k=>ft.length?Math.round(ft.reduce((s,x)=>s+x[k],0)/ft.length):null;
+  const w0=ma7(t),w14=ma7(addDays(t,-14)),wLeft=Math.max(1,(parseYmd(st.goalDate)-parseYmd(t))/6048e5);
+  const rate=w0!=null&&w14!=null?(w0-w14)/2:null,need=w0!=null?(st.goalKg-w0)/wLeft:null;
+  const o7=rng(t,7).map(d=>S.oura[d]).filter(Boolean),av=k=>{const v=o7.map(o=>num(o[k])).filter(x=>x!=null);return v.length?v.reduce((s,x)=>s+x,0)/v.length:null};
+  const sess=rng(y,7).flatMap(workoutsOn).filter(w=>w.kind!=='walk').length,lastGym=Object.values(S.workouts).filter(w=>w.kind==='gym'&&w.date<=t).map(w=>w.date).sort().pop();
+  const kg=w0??(latestWeight()||{}).kg??null;
+  return {st,fd:fd.length,kcal:a('kcal'),p:a('p'),w0,rate,need,sleep:av('sleepHours'),steps:av('steps'),hrv:recoveryState(),o:S.oura[t]||null,sess,lastGym,kg,tdee:tdeeEstimate()}}
+const kgw=v=>(v>=0?'+':'')+v.toFixed(2)+' kg a week';
+const QA=[
+ {k:'protein',re:/\bprotein\b|\bproteina|how much meat/,a:n=>`Your target is **${n.st.protein} g a day**${n.kg?` (about ${r1(n.st.protein/n.kg)} g per kg)`:''}. ${n.p!=null?`Over your last ${n.fd} logged days you averaged ${n.p} g${n.p<n.st.protein*.92?`, so you're about ${n.st.protein-n.p} g short. Easiest fixes: a whey shake (+25 g), 250 g Greek yogurt or skyr (+25 g), or a bigger portion of chicken or tuna at lunch (+20 g).`:', right on target. Keep it there.'}`:'Log a few full days and I can tell you how close you are.'} Spread it over 3–5 meals of 30–50 g.`},
+ {k:'calories',re:/calor|kcal|how much (should i|to) eat|eat enough|eating enough|maintenance|tdee/,a:n=>`Your target is **${n.st.kcal} kcal** (${n.st.protein} g protein, ${n.st.carbs} g carbs, ${n.st.fat} g fat). ${n.kcal!=null?`You've averaged ${n.kcal} kcal over ${n.fd} logged days. `:''}${n.tdee.ready?`From your log and the scale you burn about ${n.tdee.tdee} kcal a day, so the app suggests ${n.tdee.target} kcal for your goal pace.`:'After about 3 weeks of logging food and weight, the app works out what you really burn and adjusts the target.'}`},
+ {k:'stall',re:/(stall|stuck|plateau|not progress|can'?t (increase|add|go up)|same weight).*(lift|bench|squat|press|row|deadlift|curl|pull)|(bench|squat|press|deadlift|row).*(stall|stuck|plateau)/,a:n=>{const s=liftPlan().filter(l=>l.stall);return (s.length?`Stalled right now: **${s.map(l=>l.name).join(', ')}** (no new best in 3 sessions). `:'None of your lifts are flagged as stalled. ')+'For a stalled lift: 1) check sleep and protein first; 2) drop the weight 10% and build back up over 3 weeks; or 3) switch the rep range (6–8 ↔ 10–12) or a close variation for a month. Add weight only when every set hits the top of the range.'}},
+ {k:'plateau',re:/weight.*(flat|stuck|same|not (going|moving|changing))|(not|n't|stopped) (gain|los)ing|plateau(?!.*lift)|scale (isn|won|doesn)/,a:n=>n.rate==null?`I need about two weeks of weigh-ins to judge your trend. Weigh in every morning after the bathroom, and the 7-day average does the rest.`:`Your 7-day average is moving ${kgw(n.rate)}; the goal needs ${kgw(n.need)}. ${Math.abs(n.rate-n.need)<.1?'That’s on pace: nothing to change.':n.need>n.rate?`Add about ${Math.min(400,Math.round((n.need-n.rate)*7700/7/50)*50)} kcal a day, mostly carbs around training.`:`Take about ${Math.min(400,Math.round((n.rate-n.need)*7700/7/50)*50)} kcal a day off, easiest from fats and snacks.`} ${n.fd<5?'Your food log has gaps, so log every meal for a week before changing much.':''} Day-to-day weight swings of 1 kg are water, not fat.`},
+ {k:'fluct',re:/(weight|scale).*(jump|spike|up \d|went up|heavier|fluctuat)|why .*heavier|water weight|bloat/,a:n=>`Daily weight swings of 0.5–1.5 kg are normal: salt, carbs, a late meal, a hard leg day or poor sleep all hold water. That’s why the app goes by the 7-day average${n.w0?` (yours is ${r1(n.w0)} kg)`:''}. Judge the trend over 2 weeks, never a single morning.`},
+ {k:'missed',re:/miss(ed)?|skip(ped)?|fell off|haven'?t (trained|been)|back on track|lost (a|my) week|off the wagon/,a:n=>`It happens. Don’t make it up with double sessions: just do the next session in your plan${n.st.experience?` (${programDay(0).name})`:''} with the same weights as last time. One missed week doesn’t cost muscle. ${n.sess<n.st.weekly?`You’re at ${n.sess} of ${n.st.weekly} sessions this week: fit in the next one in the next 48 hours.`:''} Missed food logging? Start again at the next meal; no need to fill in the past.`},
+ {k:'sore',re:/\bsore|doms|ache|aching|stiff/,a:()=>`Muscle soreness 1–3 days after training is normal, especially with new exercises, and it isn’t a sign of a better workout. Train anyway with a light warm-up; moving helps. Sleep, protein and a walk help most. If it’s sharp, in a joint, or one-sided and getting worse, that’s pain, not soreness: rest it and see a physio.`},
+ {k:'sleep',re:/sleep|tired|fatigue|exhausted|insomnia|energy/,a:n=>`${n.sleep!=null?`You’ve averaged ${r1(n.sleep)} h of sleep this week. `:''}Aim for 7.5–9 h in bed: it drives recovery, hunger and how your lifts move. What helps most: the same bedtime every day, no caffeine after 14:00, a cool dark room, and the last big meal 2–3 h before bed. ${n.hrv&&n.hrv.low?`Your HRV is ${-n.hrv.pct}% under normal, so keep today’s training lighter.`:''}`},
+ {k:'travel',re:/travel|trip|holiday|vacation|hotel|away|no gym|abroad/,a:n=>`On the road: aim to keep protein near ${n.st.protein} g and move every day. Hotel or no gym: 3 rounds of push ups, split squats, glute bridges, doorframe rows and a plank, 8–15 reps each, 25 minutes. Two of those a week hold your muscle for 2–3 weeks. Weigh in when you can; expect +1 kg of water from travel food that drops within a week home.`},
+ {k:'alcohol',re:/alcohol|beer|wine|drink(s|ing)?\b|party|hangover|cocktail|cerveza|vino/,a:n=>`Alcohol is 7 kcal a gram and lowers sleep quality and HRV for a night or two. If you drink: count it in your calories (a beer ≈ 150 kcal, a glass of wine ≈ 120, a cocktail 200–300), keep protein up that day, alternate with water, and don’t plan a heavy session the morning after. You can tick it under Flags on Today and see its effect on your recovery in Lab.`},
+ {k:'cardio',re:/cardio|running|\brun\b|cycling|spin|steps.*(gains|muscle)|kill.*gains|conditioning/,a:n=>`Cardio doesn’t kill gains in sensible amounts: 2–3 sessions a week or daily walking helps recovery and heart health. Keep hard cardio away from leg day (6+ hours apart, or on other days), and eat for it: on cardio days your burn is higher${n.st.goalType==='gain'?', so add a snack':''}. ${n.st.goalType==='cut'?'For fat loss, steps beat extra intense cardio: they cost little recovery.':''}`},
+ {k:'supps',re:/supplement|vitamin|omega|magnesium|zinc|ashwagandha|pre.?workout|what should i take/,a:n=>`Only a few supplements have strong evidence: **creatine** (5 g a day, any time), **protein powder** when food falls short, **vitamin D** in winter if you get little sun, and caffeine before training. Omega-3 helps if you eat little fish. Everything else is optional. Your stack in Setup has ${n.st.stack.length} item${n.st.stack.length===1?'':'s'}; tick them on Today and test them in Lab.`},
+ {k:'creatine',re:/creatin/,a:()=>`Creatine monohydrate, **5 g a day, every day**, any time, with or without food. No loading needed (it just gets there faster). It adds about 1 kg of water in the muscles in the first weeks: that’s expected, not fat. It’s among the most studied supplements and safe for healthy people.`},
+ {k:'whey',re:/whey|protein (powder|shake)|shake/,a:n=>`Whey is just convenient protein: about 25 g per scoop. Use it when food doesn’t get you to ${n.st.protein} g, typically after training or as a snack. Any time of day works; total daily protein matters far more than timing.`},
+ {k:'deload',re:/deload|overtrain|burn(ed|t)? out|need a break|take a week off/,a:n=>`Deload when lifts stall across the board, joints ache, or motivation and sleep drop for over a week, or simply every 6–8 weeks. A deload week: same exercises, half the sets, weights about 10% lighter. ${n.hrv?`Your HRV is ${n.hrv.pct>0?'+':''}${n.hrv.pct}% against your normal${n.hrv.low?', which supports taking it easy now':''}.`:''}`},
+ {k:'injury',re:/injur|pain|hurt|strain|sprain|tweak|pulled|tendon|tendin|sharp|numb|swollen|pop(ped)?\b/,a:()=>`I can’t assess an injury, so please **see a physio or doctor**, especially for sharp pain, swelling, numbness or pain that stays at rest. Until then: train around it, never through it. Swap the exercises that hurt (Setup › your profile can mark back, knee or shoulder issues so the program avoids them), and keep everything pain-free.`},
+ {k:'program',re:/program|split|routine|plan (for|this) week|what (should i|do i) (train|do) today|today'?s (session|workout)|next (session|workout)/,a:n=>{if(!n.st.experience)return `Tap Suggest on the training card for today’s session: it picks the focus most due from your own split and sets each lift’s weight.`;const s=programSession(0);return `You’re on **${program().name}**. Next up: **${s.focus}** — ${s.exercises.map(e=>e.name).join(', ')}. Tap Suggest on the training card for sets and weights.`}},
+ {k:'today',re:/should i (train|lift|go to the gym|work ?out)|train today|ready to train|readiness|hrv|recovered/,a:n=>{const o=n.o;return `${o&&o.readiness!=null?`Readiness ${o.readiness}${o.sleepHours?`, ${r1(o.sleepHours)} h sleep`:''}. `:''}${n.hrv?`HRV ${n.hrv.now} against your normal ${n.hrv.base} (${n.hrv.pct>0?'+':''}${n.hrv.pct}%). `:''}${n.hrv&&n.hrv.low||o&&num(o.readiness)!=null&&o.readiness<70?'Train, but keep it easy: same weights, one set fewer, or swap for a walk.':'Good to train as planned.'}${!o&&!n.hrv?' Without ring data: if you slept 7 h+ and nothing hurts, train as planned.':''}`}},
+ {k:'rest',re:/rest day|days off|how many days|recover between|every day|train daily/,a:n=>`Muscles need about 48 h before training them hard again. ${n.st.experience?`Your ${program().name.toLowerCase()} spaces that out for you. `:''}Take at least 1–2 full rest days a week; walking on them helps. Your target is ${n.st.weekly} sessions a week, and you did ${n.sess} in the last 7 days.`},
+ {k:'pre',re:/before (my |the )?(workout|training|gym|lifting)|pre.?(workout|training) (meal|food|snack|eat)/,a:()=>`1–3 h before training: a normal meal with protein and carbs (chicken and rice, eggs on toast, yogurt with oats and fruit). Under an hour before: something small and easy, like a banana or a yogurt. Coffee 30–60 min before helps if you drink it.`},
+ {k:'post',re:/after (my |the )?(workout|training|gym)|post.?(workout|training)|recovery meal/,a:n=>`Within a couple of hours after training: 30–50 g protein and some carbs, e.g. a whey shake and a banana, or a proper meal with chicken, rice and veg. ${n.st.carbCycle!==false?'Training days get a few more carbs in your targets already.':''} There’s no need to rush: the day’s total matters most.`},
+ {k:'overate',re:/overate|ate too much|cheat|binge|blew (it|my diet)|pigged|too many calories|went over/,a:n=>`One big day doesn’t undo a week: 1,000 kcal over is about 0.1 kg of fat, and most of tomorrow’s scale jump is water and salt. Don’t skip meals to make up for it: go back to your normal ${n.st.kcal} kcal with full protein tomorrow, drink water, and take a walk.`},
+ {k:'water',re:/water|hydrat|how much (should i )?drink/,a:n=>`Roughly 35 ml per kg of body weight a day${n.kg?`, about ${Math.round(n.kg*0.035*10)/10} litres for you`:''}, plus 0.5–1 l per hour of training. Pale yellow urine means you’re fine. Creatine users don’t need extra beyond that.`},
+ {k:'steps',re:/steps|walking|walk more|neat/,a:n=>`Your daily steps goal is ${n.st.stepGoal||10000}. ${n.steps!=null?`This week you’ve averaged ${Math.round(n.steps)}. `:''}Steps burn about 40 kcal per 1,000 and barely affect recovery, so they’re the best extra burn ${n.st.goalType==='cut'?'for fat loss':'there is'}. A 10-minute walk after meals adds 3,000 a day.`},
+ {k:'rate',re:/how fast|how much (weight )?(should|can) i (gain|lose)|rate of (gain|loss)|per week|per month|realistic/,a:n=>`${n.st.goalType==='cut'?'For fat loss: 0.5–1% of body weight a week keeps muscle.':n.st.goalType==='recomp'?'Recomp: the scale stays about flat while the waist shrinks and lifts go up.':'For lean gain: about 0.25–0.5% of body weight a month for experienced lifters, up to 1% for beginners; faster is mostly fat.'} Your goal of ${n.st.goalKg} kg by ${fmtLong(n.st.goalDate)} needs ${n.need!=null?kgw(n.need):'a steady pace'}${n.rate!=null?`, and you're moving ${kgw(n.rate)}`:''}.`},
+ {k:'bodyfat',re:/body ?fat|bf ?%|lean mass|measure|tape|waist/,a:()=>`Measure every Sunday morning: waist at the navel and neck${female()?', plus hips at the widest point':''}. With your height that gives a US Navy body-fat estimate (±3%), and the app shows lean mass next to your weight trend. Tap Measure under Progress › Weight. A waist going down while weight holds is fat loss.`},
+ {k:'timing',re:/carbs? (at|before) (night|bed)|eat(ing)? late|meal timing|intermittent|fasting|breakfast|how many meals/,a:()=>`Timing matters far less than daily totals. Late carbs don’t turn into fat, and skipping breakfast is fine if you still hit protein. What does help: protein spread over 3–5 meals, and not going to bed stuffed if it hurts your sleep.`},
+ {k:'belly',re:/belly|abs\b|six.?pack|love handles|spot reduc|lose fat (from|on)|stomach fat/,a:n=>`You can’t burn fat from one spot: crunches strengthen the abs but don’t remove the fat over them. Visible abs need a low overall body fat (roughly 10–12% for men, 18–20% for women), which comes from a calorie deficit, enough protein and keeping your lifts strong. ${n.st.goalType!=='cut'?'Your current goal isn’t a cut, so expect slow change there.':''}`},
+ {k:'sugar',re:/sugar|fruit|sweets|chocolate|dessert|candy/,a:n=>`Fruit is fine: fibre, vitamins, few calories. Sweets fit if the day’s calories and protein are on target; about 10% of your calories (${Math.round(n.st.kcal*.1)} kcal) from treats is a sensible cap. Pair them with a meal rather than eating them alone.`},
+ {k:'veg',re:/vegetarian|vegan|plant.?based|no meat|without meat/,a:n=>`Plant protein works if you eat a bit more of it: tofu and tempeh (12–20 g per 100 g), seitan (25 g), lentils and chickpeas (8–9 g per 100 g cooked), soy milk, and Greek yogurt or skyr and eggs if you eat them. A pea or soy protein powder makes ${n.st.protein} g much easier.`},
+ {k:'snacks',re:/snack|high.?protein (food|idea)|what (can|should) i eat/,a:()=>`High-protein snacks: Greek yogurt or skyr (+ fruit), cottage cheese, a whey shake, tuna on rice cakes, boiled eggs, turkey slices, edamame, jerky, a protein bar. Tap Suggest on the food card for a meal that fits what’s left of today.`},
+ {k:'reps',re:/how many (reps|sets)|rep range|sets and reps|failure|rir|rpe/,a:()=>`Most muscle growth happens anywhere from 6 to 15 reps when sets end 1–2 reps short of failure. Big lifts (squat, press, row): 6–10. Smaller moves (raises, curls, extensions): 10–15. Aim for about 10–20 hard sets per muscle per week; your program already does that.`},
+ {k:'overload',re:/progressive overload|when (should i )?(increase|add|go up)|add weight|how (much|often) (to )?increase/,a:()=>`Double progression: stay at a weight and add reps until every set reaches the top of the range (e.g. 10 for a 6–10 range), then add the smallest jump (2–2.5 kg on barbells, 1–2 kg on dumbbells) and start again at the bottom. The app calculates each lift’s next weight from your last session.`},
+ {k:'warmup',re:/warm.?up|stretch|mobility/,a:()=>`5 minutes of easy cardio, then 2–3 lighter ramp-up sets of your first exercise (e.g. 50%, 70%, 85% of the working weight, few reps). Long static stretching before lifting isn’t needed; do it after or on rest days if you want more mobility.`},
+ {k:'length',re:/how long (should|is|does)|session length|too long|minutes|short on time|only have \d+ ?min/,a:()=>`45–75 minutes is plenty. Short on time? Do the first 3–4 exercises of today’s session and skip the isolation work; or pair exercises (e.g. a push and a pull) with 60–90 s rest between them.`},
+ {k:'caffeine',re:/caffeine|coffee|energy drink/,a:()=>`Caffeine (3 mg per kg, a coffee or two) 30–60 min before training improves strength and focus. Keep it before 14:00: later cups cut deep sleep even when you fall asleep fine. You can flag late caffeine on Today and test its effect in Lab.`},
+ {k:'motivation',re:/motivat|consisten|lazy|can'?t be bothered|discipline|give up|quit/,a:n=>`Make it easy rather than heroic: a fixed time for training, the gym bag ready, and the bar set low on bad days (do just the first two exercises). Track the trend, not the day: your 7-day average and lifts move slowly. ${n.sess?`You did ${n.sess} sessions in the last 7 days: that counts.`:''}`},
+ {k:'restaurant',re:/restaurant|eat(ing)? out|takeaway|take.?out|fast food|dinner out|menu/,a:()=>`Eating out: pick a protein-centred main (grilled meat or fish), ask for sauces on the side, choose one starch, skip the bread basket if you’re near your calories. Log it with a description and the app estimates it. One meal out a week is nothing to worry about.`},
+ {k:'sick',re:/\bsick|\bill\b|\bflu\b|\bcold\b|fever|covid|infection/,a:()=>`If it’s only above the neck (a runny nose) and you feel OK, light training is fine. Fever, body aches or chest symptoms: rest completely until you’re symptom-free for a day, then come back at lighter weights for a session or two. Keep protein and fluids up. See a doctor if it lasts or gets worse.`},
+ {k:'cycle',re:/period|menstru|cycle|pms/,a:()=>`Train through your cycle as you feel: strength often feels best in the first half, and lighter days are fine before and during your period. Expect 1–2 kg of water on the scale before your period; compare weight with the same point last month, not last week.`},
+ {k:'fat',re:/\bfat\b.*(eat|gram|intake|how much)|how much fat|healthy fats/,a:n=>`Your fat target is ${n.st.fat} g a day (about 0.8 g per kg). Keep it at least that for hormones; good sources are olive oil, nuts, eggs, avocado and oily fish. Fat is the easiest place to cut calories quietly: oil adds 90 kcal per tablespoon.`},
+ {k:'carbs',re:/\bcarbs?\b|carbohydrate|keto|low.?carb|rice|pasta/,a:n=>`Your carb target is ${n.st.carbs} g${n.st.carbCycle!==false?', with more on training days and less on rest days':''}. Carbs fuel hard training; low-carb isn’t better for fat loss when calories and protein are equal. Good picks: rice, potatoes, oats, fruit, bread, pasta.`},
+ {k:'goal',re:/my goal|change (my )?goal|bulk|cut\b|recomp|lean gain|gaining phase/,a:n=>`Your goal: **${(GOALS[n.st.goalType]||GOALS.gain).label}**, ${n.st.goalKg} kg by ${fmtLong(n.st.goalDate)}. Change it in Setup › Goal; tap Recalculate there to update calories and macros.`}
+];
+function qaExercise(q){const lo=q.toLowerCase();let best=null,bs=0;
+  // the longest full name wins; "bench press" alone means the first (plainest) bench press in the list
+  for(const e of EXERCISES){const n=e.name.toLowerCase(),short=n.replace(/^(barbell|dumbbell|machine|cable|smith machine) /,'');
+    const sc=lo.includes(n)?1000+n.length:short.length>5&&lo.includes(short)?short.length:0;if(sc>bs){bs=sc;best=e}}
+  if(!best)return null;
+  if(/instead|alternative|swap|replace|substitut|other than|can'?t do|hurts?|pain|don'?t have/.test(lo)){
+    // a sore joint named in the question counts like one marked in Setup
+    const st={...S.settings,injuries:[...new Set([...(S.settings.injuries||[]),...['back','knee','shoulder'].filter(k=>lo.includes(k))])]},pain=/hurt|pain|sore|injur/.test(lo);
+    const alts=exAlternatives(best.name,st).slice(0,4);
+    return (pain?'Stop anything that hurts, and get it checked by a physio if it doesn’t settle in a week or two. ':'')+(alts.length?`Instead of **${best.name}** (${best.mus}), try: ${alts.map(a=>`**${a.name}**`).join(', ')}. ${alts[0].cue}`:`I don’t have a swap for ${best.name} with your equipment.`)}
+  const l=liftPlan().find(x=>x.name.toLowerCase()===best.name.toLowerCase());
+  return `**${best.name}** works the ${best.mus}. ${best.cue}${l?` Next time: ${l.next.w} kg × ${l.next.r} (${l.why}).`:''}`}
+function qaAnswer(q){const lo=' '+String(q||'').toLowerCase()+' ';
+  const ex=/how (do|to)|form|technique|instead|alternative|swap|replace|substitut|what is|muscles?|next time|cue/.test(lo)?qaExercise(lo):null;if(ex)return ex;
+  const hit=QA.filter(x=>x.re.test(lo));if(!hit.length)return qaExercise(lo);
+  // pain wins over everything; otherwise the first rule that matches
+  const h=hit.find(x=>x.k==='injury')||hit[0];try{return h.a(qaNums())}catch(e){console.warn('qa',h.k,e);return null}}
+
+/* ---------- friends: joining with an invite code, the onboarding wizard, connections, the owner's panel ---------- */
+const BACKEND='https://script.google.com/macros/s/AKfycbwbARdb3Ntyv-Zb48F4WRFe2CRySCFB9Rz3j-pTqn6Wf52hUPUu0xaQotLkY_HJ705z/exec';
+const APP_URL='https://c26b8w67hc-jpg.github.io/rcpm/',OWNER='Bence';
+const JOIN_Q=(()=>{try{return (new URLSearchParams(location.search).get('join')||'').toUpperCase().replace(/[^A-Z0-9]/g,'')}catch(e){return ''}})();
+const localOnly=()=>{try{return localStorage.getItem('rcmp.localOnly')==='1'}catch(e){return false}};
+// the join screen: the installable app without an account (opened locally it stays the old local app unless there's a ?join= link)
+const needsJoin=()=>!hasClaude()&&!useGas()&&!localOnly()&&(!!JOIN_Q||location.protocol!=='file:');
+let JN={step:'code',code:JOIN_Q,name:'',err:'',busy:false};
+const iosBrowser=()=>/iphone|ipad|ipod/i.test(navigator.userAgent)&&navigator.standalone===false;
+function gateView(){
+  if(needsJoin())return joinView();
+  if(isFriend()&&(!S.settings.onboarded||(OB&&OB.step===4))){
+    if(!gasReady&&!S.settings.onboarded&&!Object.keys(S.weights).length)return `<section class="gate-v"><p class="empty" style="text-align:center;margin-top:40vh">${gasErr?esc(gasErr)+` <button class="btn small" data-a="gasRetry">Try again</button>`:busy('Loading your account…')}</p></section>`;
+    return onboardView()}
+  return ''}
+function joinView(){const j=JN,err=j.err?`<p class="note err" role="alert">${esc(j.err)}</p>`:'';
+  const hero=`<div class="gate-hero"><h2 class="gate-t">Train, eat and recover <em>on purpose</em>.</h2><p class="note">Weight, training, food and recovery in one place, with a coach that reads your own numbers.</p></div>`;
+  if(j.step==='connect')return `<section class="gate-v">${hero}${connectCard()}<button class="linkbtn" data-a="jnBack">Back</button></section>`;
+  if(j.step==='name')return `<section class="gate-v">${hero}<section class="card"><h3>What should the coach call you?</h3>
+    <label style="margin-top:10px">Your first name<input id="jnName" data-jn="name" value="${esc(j.name)}" autocomplete="given-name" maxlength="40"></label>${err}
+    <div class="actions"><button class="btn primary" data-a="jnName">Continue</button><button class="btn ghost" data-a="jnBack">Back</button></div></section></section>`;
+  if(j.step==='consent')return `<section class="gate-v">${hero}<section class="card"><h3>Before you start</h3>
+    <ul class="steps" style="margin-top:10px"><li>Your log (weight, food, training, recovery, photos) is stored privately in a Google Drive folder that belongs to ${OWNER}, who runs RCMP. Only you and ${OWNER} can technically access it; it isn’t shared with anyone else.</li>
+    <li>When you ask the AI coach something, your question and the relevant numbers go to Anthropic’s Claude API to write the answer. Most answers are built in and never leave the app.</li>
+    <li>If you connect Oura or Apple Health, their daily numbers are copied into that same private folder.</li>
+    <li>Ask ${OWNER} any time to export or delete your data.</li></ul>${err}
+    <div class="actions"><button class="btn primary" data-a="jnJoin"${j.busy?' disabled':''}>${j.busy?busy('Creating your account…'):'I agree, create my account'}</button><button class="btn ghost" data-a="jnBack">Back</button></div></section></section>`;
+  return `<section class="gate-v">${hero}<section class="card"><h3>Have an invite code?</h3>
+    <label style="margin-top:10px">Invite code<input id="jnCode" data-jn="code" value="${esc(j.code)}" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="10" placeholder="6 letters and numbers" style="letter-spacing:.2em;text-transform:uppercase"></label>${err}
+    ${iosBrowser()?`<p class="note">Tip: add RCMP to your Home Screen first (Share → Add to Home Screen), then open it from there and enter the code. If you join here first, the same code works again in the app for 24 hours.</p>`:''}
+    <div class="actions"><button class="btn primary" data-a="jnCode"${j.busy?' disabled':''}>${j.busy?busy('Checking…'):'Continue'}</button></div></section>
+    <details class="more card"><summary>No code?</summary><p class="note">RCMP is invite-only for now. Ask whoever sent you here for a code.</p>
+    <div class="actions"><button class="btn small" data-a="jnOwner">I have a server address and token</button><button class="btn small" data-a="jnLocal">Try it on this device only</button></div></details></section>`}
+async function joinCall(code,name){
+  const r=await fetch(BACKEND+'?op=join&code='+encodeURIComponent(code),{method:'POST',body:JSON.stringify({name:name||''}),headers:{'Content-Type':'text/plain;charset=utf-8'}});
+  return r.json()}
+async function jnSubmit(withName){const code=(JN.code||'').toUpperCase().replace(/[^A-Z0-9]/g,'');
+  if(code.length<6){JN.err='The code is 6 letters and numbers.';render();return}
+  JN.busy=true;JN.err='';render();
+  let j;try{j=await joinCall(code,withName?JN.name:'')}catch(e){JN.busy=false;JN.err='Couldn’t reach RCMP. Check your connection and try again.';render();return}
+  JN.busy=false;
+  if(j.ok){API={url:BACKEND,token:j.token};ME={uid:j.uid,owner:false,name:j.name};try{localStorage.setItem(APIKEY,JSON.stringify(API))}catch(e){}saveMe();
+    toast(j.returning?'Signed in. Loading your log…':'Welcome to RCMP');setTimeout(()=>location.replace(location.pathname),500);return}
+  if(j.code==='no_name'){JN.step='name';render();return}
+  JN.err=j.code==='bad_code'?'That code isn’t valid. Codes last 14 days; ask for a new one.':j.code==='full'?'RCMP is full right now. Ask '+OWNER+' about it.':(j.error||'Something went wrong.');render()}
+
+/* onboarding: about 3 minutes, then the app */
+const OBKEY_='rcmp.ob';let OB=null;try{OB=JSON.parse(localStorage.getItem(OBKEY_)||'null')}catch(e){}
+const saveOB=()=>{try{if(OB)localStorage.setItem(OBKEY_,JSON.stringify(OB));else localStorage.removeItem(OBKEY_)}catch(e){}};
+function obInit(){if(OB)return OB;const st=S.settings,lw=latestWeight();
+  OB={step:0,goal:'',sex:'',age:'',heightCm:'',kg:lw?String(lw.kg):'',days:3,exp:'',equip:'gym',inj:[],city:'Barcelona',shop:'Mercadona',name:st.name||(ME&&ME.name)||''};return OB}
+const r50=v=>Math.round(v/50)*50,r5=v=>Math.round(v/5)*5;
+function calcTargets(o){const kg=num(o.kg),h=num(o.heightCm),a=num(o.age),fem=o.sex==='female',d=Math.max(2,Math.min(6,+o.days||3));
+  const bmr=10*kg+6.25*h-5*a+(fem?-161:5),tdee=bmr*({2:1.375,3:1.45,4:1.5,5:1.6,6:1.7}[d]);
+  const adj=o.goal==='cut'?-Math.min(500,r50(tdee*.2)):o.goal==='recomp'?-100:({new:450,lt1:400,y13:300,y3:250}[o.exp]||300)*(fem?.75:1);
+  const kcal=r50(tdee+adj),protein=r5(kg*({cut:2.2,recomp:2,gain:1.8}[o.goal]||1.8)),fat=r5(kg*.8),carbs=Math.max(50,r5((kcal-protein*4-fat*9)/4));
+  const wk=o.goal==='cut'?16:26,rate=o.goal==='cut'?-kg*.006:o.goal==='recomp'?0:({new:.3,lt1:.25,y13:.15,y3:.1}[o.exp]||.2)*(fem?.6:1);
+  return {kcal,protein,fat,carbs,bmr:Math.round(bmr),tdee:Math.round(tdee),goalKg:Math.round((kg+rate*wk)*2)/2,goalDate:addDays(today(),wk*7)}}
+const LOOKS={gain:'more muscle on the shoulders, chest, back and arms with a lean waist',cut:'leaner: a smaller waist and more visible muscle',recomp:'about the same weight, leaner and more defined'};
+function onboardView(){const o=obInit(),st=S.settings,dots=`<div class="ob-dots" aria-hidden="true">${[0,1,2,3,4].map(i=>`<i${i<=o.step?' class="on"':''}></i>`).join('')}</div>`;
+  const pill=(k,v,l)=>`<button role="tab" data-a="obSet" data-k="${k}" data-v="${v}" aria-selected="${String(o[k])===String(v)}">${l}</button>`;
+  const choice=(k,v,l,sub)=>`<button class="choice${o[k]===v?' on':''}" data-a="obSet" data-k="${k}" data-v="${v}" aria-pressed="${o[k]===v}"><b>${l}</b>${sub?`<small>${sub}</small>`:''}</button>`;
+  const inp=(k,l,extra='')=>`<label>${l}<input id="ob_${k}" data-ob="${k}" value="${esc(o[k])}" type="text" inputmode="decimal" autocomplete="off" ${extra}></label>`;
+  const nav=(next,label='Continue')=>`<div class="actions">${o.step?`<button class="btn ghost" data-a="obBack">Back</button>`:''}<button class="btn primary" data-a="${next}">${label}</button></div>`;
+  let body='';
+  if(o.step===0)body=`<h2 class="gate-t">Hi ${esc(o.name||'there')}. What’s the <em>goal</em>?</h2><div class="choices">${Object.entries(GOALS).map(([k,g])=>choice('goal',k,g.label,g.sub)).join('')}</div>`;
+  else if(o.step===1)body=`<h2 class="gate-t">About <em>you</em></h2><p class="note">This sets your calories and protein. Only you see it.</p>
+    <div class="pills" role="tablist" style="margin:14px 0">${pill('sex','male','Male')}${pill('sex','female','Female')}</div>
+    <div class="g2">${inp('age','Age')}${inp('heightCm','Height (cm)')}</div><div class="g2">${inp('kg','Weight today (kg)')}</div>
+    <details class="more" style="margin-top:12px"><summary>Where you shop (for meal plans)</summary><div class="g2" style="margin-top:8px"><label>City<input data-ob="city" id="ob_city" value="${esc(o.city)}"></label><label>Supermarket<input data-ob="shop" id="ob_shop" value="${esc(o.shop)}"></label></div></details>${nav('obNext')}`;
+  else if(o.step===2)body=`<h2 class="gate-t">Your <em>training</em></h2>
+    <p class="lab" style="margin-top:14px">Gym days a week</p><div class="pills" role="tablist">${[2,3,4,5,6].map(d=>pill('days',d,String(d))).join('')}</div>
+    <p class="lab" style="margin-top:16px">Lifting experience</p><div class="choices">${Object.entries(EXPERIENCE).map(([k,l])=>choice('exp',k,l)).join('')}</div>
+    <p class="lab" style="margin-top:16px">Where you train</p><div class="choices">${Object.entries(EQUIPMENT).map(([k,l])=>choice('equip',k,l)).join('')}</div>
+    <p class="lab" style="margin-top:16px">Anything to go easy on? (optional)</p><div class="chips">${[['back','Lower back'],['knee','Knees'],['shoulder','Shoulders']].map(([k,l])=>`<button class="chip${o.inj.includes(k)?' on':''}" data-a="obInj" data-k="${k}" aria-pressed="${o.inj.includes(k)}">${l}</button>`).join('')}</div>${nav('obNext')}`;
+  else if(o.step===3){const t=o.t||(o.t=calcTargets(o)),p=program({gymMin:o.days,experience:o.exp});
+    body=`<h2 class="gate-t">Your <em>targets</em></h2><p class="note">Estimated from your body and training (Mifflin–St Jeor × activity, about ${t.tdee} kcal to maintain). After three weeks of logging, the app checks them against your real weight trend and adjusts.</p>
+    <div class="g2" style="margin-top:14px">${['kcal','protein','carbs','fat'].map(k=>`<label>${{kcal:'Calories',protein:'Protein (g)',carbs:'Carbs (g)',fat:'Fat (g)'}[k]}<input data-obt="${k}" id="obt_${k}" value="${t[k]}" inputmode="decimal" autocomplete="off"></label>`).join('')}</div>
+    <div class="g2" style="margin-top:12px"><label>Goal weight (kg)<input data-obt="goalKg" id="obt_goalKg" value="${t.goalKg}" inputmode="decimal"></label><label>By<input data-obt="goalDate" id="obt_goalDate" type="date" value="${t.goalDate}"></label></div>
+    <p class="note">Program: <b>${esc(p.name)}</b> for ${esc(EQUIPMENT[o.equip])}. Each session shows the exercises, sets and weights, and adds weight when you hit the top of the reps.</p>${nav('obSave','Save and continue')}`}
+  else body=`<h2 class="gate-t">Connect your <em>data</em></h2><p class="note">All optional, and you can do it later in Setup.</p>${connectionsCard(true)}
+    <div class="actions"><button class="btn primary" data-a="obDone">Start using RCMP</button></div>`;
+  return `<section class="gate-v ob">${dots}${body}</section>`}
+async function obSave(){const o=OB,t=o.t,st=S.settings,days=Math.max(2,Math.min(6,+o.days||3));
+  const n={...o.t};for(const k of ['kcal','protein','carbs','fat','goalKg']){const v=num(n[k]);if(v==null||v<=0){toast('Check the '+k+' number');return}n[k]=v}
+  if(!isDate(n.goalDate)||n.goalDate<=today()){toast('Pick a goal date in the future');return}
+  const s={...clean(st),name:o.name||st.name||'',sex:o.sex,age:num(o.age),heightCm:num(o.heightCm),goalType:o.goal,goalKg:n.goalKg,goalDate:n.goalDate,kcal:n.kcal,protein:n.protein,carbs:n.carbs,fat:n.fat,
+    weekly:days,gymMin:days,stepGoal:o.goal==='cut'?10000:8000,experience:o.exp,equipment:o.equip,injuries:o.inj,programStart:today(),city:o.city||'',shop:o.shop||'',
+    classWords:'',goalLook:LOOKS[o.goal],coachNotes:'',stack:[{name:'Creatine',dose:'5 g',when:'Any time'}],ouraSheetId:'',confirmed:true,connectSkipped:true,onboarded:false};
+  if(!await safe(()=>saveSettings(s)))return;
+  const kg=num(o.kg);if(kg&&!S.weights[today()])await safe(()=>put('weights',today(),{kg:Math.round(kg*100)/100,t:Date.now()}));
+  o.step=4;saveOB();window.scrollTo(0,0);render()}
+async function obDone(){if(await safe(()=>saveSettings({...S.settings,onboarded:true}))){OB=null;saveOB();tab='today';window.scrollTo(0,0);render();toast('You’re set. Log meals and sessions as you go.')}}
+
+/* connections (friends): Oura OAuth, Apple Health, Fitbod */
+let ouraPending=false;
+function ago2(s){if(!s)return '';const t=Date.parse(String(s).replace(' ','T'));return isFinite(t)?ago(t):s}
+function connectionsCard(inWizard){if(!isFriend())return '';const m=ME||{},o=m.oura||{},h=m.health||{},hurl=API?API.url+'?op=health&token='+API.token:'';
+  return `<section class="card conn"><div class="card-h"><h2>${inWizard?'Connections':'Your connections'}</h2></div>
+    <div class="conn-r"><div><b>Oura ring</b><small>${o.err?esc(o.err):o.connected?'Connected'+(o.last?' · synced '+esc(ago2(o.last)):''):'Sleep, readiness, HRV, steps and workouts every 30 minutes.'}</small></div>
+      ${o.ready===false?'<small class="aside">Not available yet</small>':`<button class="btn small${o.connected&&!o.err?'':' primary'}" data-a="ouraConnect">${o.connected?'Reconnect':'Connect'}</button>`}</div>
+    <div class="conn-r"><div><b>Apple Health</b><small>${h.last?'Last delivery '+esc(ago2(h.last)):'Steps, weight and strength workouts from your iPhone.'}</small></div><button class="btn small" data-a="healthHow">${healthOpen?'Hide':'Set up'}</button></div>
+    ${healthOpen?`<div class="conn-how"><label>Your private Health address<input id="hUrl" value="${esc(hurl)}" readonly></label><div class="actions" style="margin-top:8px"><button class="btn small" data-a="copyHealth">Copy address</button></div>
+      ${m.shortcut?`<p class="note"><b>Free way, with the RCMP Shortcut:</b></p><ol class="steps"><li><a href="${esc(m.shortcut)}" target="_blank" rel="noopener">Get the RCMP Shortcut</a> and paste the address above when it asks.</li><li>Shortcuts → Automation → New → Time of Day (say 22:00, daily) → Run Shortcut → RCMP Health, and turn off Ask Before Running.</li></ol>`:''}
+      <p class="note"><b>${m.shortcut?'Fully automatic':'Automatic'}, with Health Auto Export</b> (an App Store app; automations are its paid feature):</p>
+      <ol class="steps"><li>Automations → New Automation → REST API. Paste the address as the URL.</li><li>Export format JSON, version 2. Data type Health Metrics: Step Count, Weight &amp; Body Mass, Body Fat Percentage. Add a second automation with Workouts if you want your gym sessions’ length and calories.</li><li>Aggregation: Day. Sync cadence: every hour. Turn it on.</li></ol>
+      <p class="note">Keep the address to yourself: anyone with it could add numbers to your log.</p></div>`:''}
+    <div class="conn-r"><div><b>Fitbod</b><small>${Object.values(S.workouts).some(w=>w.source==='fitbod-csv')?'Imported. Export again any time to add new sessions.':'Your lifting history, set by set, from a CSV export.'}</small></div><button class="btn small" data-a="openFitbod">Import CSV</button></div></section>`}
+let healthOpen=false;
+async function ouraConnect(){const w=window.open('','_blank');
+  try{const r=await gas('ouraStart');ouraPending=true;if(w)w.location.href=r.url;else location.href=r.url}
+  catch(e){if(w)w.close();toast(e&&e.code==='oura_not_ready'?'Oura isn’t set up on the server yet. Ask '+OWNER+'.':'Couldn’t start the Oura sign-in. Try again.')}}
+async function friendSync(manual){if(ouraSyncing)return;
+  if(ME&&ME.oura&&ME.oura.connected){ouraSyncing=true;render();try{await gas('ouraSync')}catch(e){if(manual)toast('Oura didn’t answer: '+(e.message||'try again later'))}ouraSyncing=false}
+  try{const r=await gas('me');if(r.me){ME=r.me;saveMe()}}catch(e){}
+  syncOuraSheet(manual)}
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&ouraPending&&isFriend()){ouraPending=false;friendSync(false)}});
+
+/* account (friends): who you are, the AI budget, sign out */
+let signOutAsk=false;
+function accountCard(){const m=ME||{},a=m.ai||{};const left=a.cap?Math.max(0,1-(a.spent||0)/a.cap):null;
+  return `<section class="card"><div class="card-h"><h2>Account</h2><span class="aside">${outbox.length?outbox.length+' edits waiting':'Synced'}</span></div>
+    <dl class="spec"><div><dt>Signed in as</dt><dd>${esc(S.settings.name||m.name||'')}</dd></div>${left!=null?`<div><dt>AI coach this month</dt><dd><b>${Math.round(left*100)}</b>% left</dd></div>`:''}</dl>
+    <p class="note">Most coach answers are built in and free. The AI answers the rest within a small monthly budget that resets on the 1st.</p>
+    <div class="actions"><button class="btn small" data-a="signOut">${signOutAsk?'Tap again to sign out':'Sign out on this device'}</button></div></section>`}
+function signOut(){if(!signOutAsk){signOutAsk=true;render();setTimeout(()=>{signOutAsk=false;schedule()},4000);return}
+  if(outbox.length){toast('Some edits haven’t synced yet. Connect to the internet first.');signOutAsk=false;render();return}
+  ['rcmp.api','rcmp.me','rcmp.outbox',LSKEY,'recomplog.chat',OBKEY_,'recomplog.cal'].forEach(k=>{try{localStorage.removeItem(k)}catch(e){}});location.replace(location.pathname)}
+
+/* owner: invite friends, see how they're doing, remove them */
+let FR={data:null,busy:false,err:'',code:null,codeFor:null,ask:null};
+async function frLoad(){if(FR.busy)return;FR.busy=true;FR.err='';schedule();try{FR.data=await gas('friends')}catch(e){FR.err=e.message||'Couldn’t load your friends'}FR.busy=false;schedule()}
+const inviteText=c=>`Join me on RCMP, my training and nutrition tracker. Open ${APP_URL}?join=${c} on your phone, add it to your Home Screen, and enter the code ${c}. The code works for 14 days.`;
+function friendsCard(){if(!isOwnerGas())return '';if(!FR.data&&!FR.busy&&!FR.err)setTimeout(frLoad,0);const d=FR.data;
+  const when=t=>t?ago(t):'never';
+  const users=d?d.users.filter(u=>!u.revoked):[],gone=d?d.users.filter(u=>u.revoked):[];
+  return `<section class="card"><div class="card-h"><h2>Friends</h2><span class="aside">${d?users.length+' of '+d.max:''}</span></div>
+    ${FR.busy&&!d?`<p class="note">${busy('Loading…')}</p>`:FR.err?`<p class="note err">${esc(FR.err)} <button class="btn small" data-a="frLoad">Try again</button></p>`:''}
+    ${d?`${users.length?`<ul class="list">${users.map(u=>`<li class="item"><div class="body"><div class="t">${esc(u.name)}</div>
+      <div class="s">Opened ${esc(when(u.seen))} · AI $${(u.spent||0).toFixed(2)} of $${(+u.cap).toFixed(2)} · Oura ${u.ouraErr?'needs reconnecting':u.oura?'on':'off'} · Health ${u.healthLast?esc(ago2(u.healthLast)):'off'}</div>
+      <div class="actions" style="margin-top:6px"><button class="btn small" data-a="frRelogin" data-u="${u.uid}">Sign-in code</button><button class="btn small" data-a="frRevoke" data-u="${u.uid}">${FR.ask===u.uid?'Tap again to remove':'Remove'}</button></div></div></li>`).join('')}</ul>`:'<p class="empty">No friends yet. Make an invite and send it.</p>'}
+      ${FR.code?`<div class="invite"><p class="lab">${FR.codeFor?'Sign-in code for '+esc(FR.codeFor):'New invite'}</p><p class="invite-c">${esc(FR.code)}</p><p class="note" style="margin-top:4px">${FR.codeFor?'Works once (and again for 24 hours), for 14 days. They enter it on their new phone.':'Works for one person, for 14 days.'}</p>
+        <div class="actions"><button class="btn small primary" data-a="frShare">Share invite</button><button class="btn small" data-a="frCopy">Copy message</button></div></div>`:''}
+      ${d.invites.length?`<p class="note">Open codes: ${d.invites.map(i=>`<b>${esc(i.code)}</b>${i.name?' (for '+esc(i.name)+')':''}`).join(', ')}</p>`:''}
+      <div class="actions"><button class="btn primary" data-a="frInvite"${users.length+d.invites.filter(i=>!i.uid).length>=d.max?' disabled':''}>New invite</button></div>
+      <label style="margin-top:14px">Shared Apple Health Shortcut link (optional, shown to friends)<input id="frShortcut" value="${esc(d.shortcut||'')}" placeholder="https://www.icloud.com/shortcuts/…"></label>
+      <div class="actions" style="margin-top:8px"><button class="btn small" data-a="frShortcut">Save link</button></div>
+      <p class="note">Your AI this month: $${d.ownerSpent.toFixed(2)} of $${d.ownerCap}. Each friend gets $0.25; everything else runs on built-in rules.${gone.length?` Removed: ${gone.map(u=>esc(u.name)).join(', ')} (their data stays in Drive).`:''}</p>`:''}</section>`}
+async function frInvite(uid){try{const r=await gas('invite',null,uid?'&uid='+encodeURIComponent(uid):'');FR.code=r.code;FR.codeFor=uid?(FR.data.users.find(u=>u.uid===uid)||{}).name:null;await frLoad()}catch(e){toast(e.code==='full'?'You already have 5 friends (open invites count too).':'Couldn’t make a code: '+(e.message||''))}}
+async function frRevoke(uid){if(FR.ask!==uid){FR.ask=uid;render();setTimeout(()=>{if(FR.ask===uid){FR.ask=null;schedule()}},4000);return}
+  FR.ask=null;try{await gas('revoke',null,'&uid='+encodeURIComponent(uid));toast('Removed. Their data stays in your Drive.');await frLoad()}catch(e){toast('Couldn’t remove: '+(e.message||''))}}
+const signInText=c=>`Your RCMP sign-in code is ${c}. Open RCMP on your phone (${APP_URL}) and enter it. It works for 14 days.`;
+async function frShare(){const t=FR.codeFor?signInText(FR.code):inviteText(FR.code);if(navigator.share){try{await navigator.share({text:t});return}catch(e){if(e&&e.name==='AbortError')return}}copyText(t)}
 
 /* ---------- events ---------- */
 const A={
@@ -2456,11 +2964,37 @@ const A={
   addSupp:()=>{setDraft.stack.push({name:'',dose:'',when:''});suppEdit=setDraft.stack.length-1;render();const i=document.getElementById('sn'+(setDraft.stack.length-1));if(i)i.focus()},
   rmSupp:b=>{setDraft.stack.splice(+b.dataset.i,1);suppEdit=-1;render()},
   apiSave:()=>apiSave(),
-  saveSet:async()=>{const s=clean(setDraft);['kcal','protein','carbs','fat','goalKg','weekly','gymMin','stepGoal'].forEach(k=>{const v=num(s[k]);s[k]=v==null?DEFAULTS[k]:v});if(!isDate(s.goalDate))s.goalDate=DEFAULTS.goalDate;['workStart','workEnd'].forEach(k=>{if(s[k]&&hm(s[k])==null)s[k]=DEFAULTS[k]});if(String(setDraft.ouraSheetId||'').trim()&&!sheetIdFrom(setDraft.ouraSheetId)){toast('That doesn’t look like a Google Sheet link or ID. Paste the full link from the sheet’s address bar.');return}s.ouraSheetId=sheetIdFrom(s.ouraSheetId);s.confirmed=true;s.stack=s.stack.filter(x=>x.name&&x.name.trim()).map(x=>({name:x.name.trim(),dose:(x.dose||'').trim(),when:(x.when||'').trim()}));
+  jnCode:()=>jnSubmit(false),jnJoin:()=>jnSubmit(true),jnOwner:()=>{JN.step='connect';render()},
+  jnName:()=>{if(!String(JN.name||'').trim()){JN.err='Add your name.';render();return}JN.err='';JN.step='consent';render()},
+  jnBack:()=>{JN.err='';JN.step=JN.step==='consent'?'name':'code';render()},
+  jnLocal:()=>{try{localStorage.setItem('rcmp.localOnly','1')}catch(e){}render()},
+  obSet:b=>{const o=obInit(),k=b.dataset.k;o[k]=k==='days'?+b.dataset.v:b.dataset.v;if(k==='goal'){o.step=1;delete o.t;window.scrollTo(0,0)}saveOB();render()},
+  obInj:b=>{const o=obInit(),k=b.dataset.k;o.inj=o.inj.includes(k)?o.inj.filter(x=>x!==k):[...o.inj,k];saveOB();render()},
+  obBack:()=>{const o=obInit();o.step=Math.max(0,o.step-1);saveOB();window.scrollTo(0,0);render()},
+  obNext:()=>{const o=obInit();
+    if(o.step===1){const a=num(o.age),h=num(o.heightCm),k=num(o.kg);
+      if(!o.sex){toast('Pick male or female: it changes the calorie formula.');return}
+      if(!(a>=14&&a<=90)){toast('Enter your age in years.');return}
+      if(!(h>=120&&h<=230)){toast('Enter your height in cm, like 178.');return}
+      if(!(k>=30&&k<=250)){toast('Enter your weight in kg, like 72.5.');return}}
+    if(o.step===2&&!o.exp){toast('Pick your lifting experience.');return}
+    if(o.step<=2)delete o.t;o.step++;saveOB();window.scrollTo(0,0);render()},
+  obSave:()=>obSave(),obDone:()=>obDone(),
+  ouraConnect:()=>ouraConnect(),healthHow:()=>{healthOpen=!healthOpen;render()},copyHealth:()=>copyText($('#hUrl').value,$('#hUrl')),
+  signOut:()=>signOut(),gasRetry:()=>{gasErr='';render();gasLoad()},
+  frLoad:()=>frLoad(),frInvite:()=>frInvite(null),frRelogin:b=>frInvite(b.dataset.u),frRevoke:b=>frRevoke(b.dataset.u),
+  frShare:()=>frShare(),frCopy:()=>copyText(FR.codeFor?signInText(FR.code):inviteText(FR.code)),
+  frShortcut:async()=>{const url=($('#frShortcut').value||'').trim();if(url&&!/^https:\/\//.test(url)){toast('Paste the full https link');return}try{await gas('shortcut',{url});toast(url?'Shortcut link saved':'Shortcut link removed');frLoad()}catch(e){toast('Couldn’t save it')}},
+  chatAI:()=>chatSend('',true),
+  setInj:b=>{const a=new Set(setDraft.injuries||[]),k=b.dataset.k;if(a.has(k))a.delete(k);else a.add(k);setDraft.injuries=[...a];render()},
+  recalcT:()=>{const d=setDraft,lw=latestWeight();if(!d.sex||!num(d.age)||!num(d.heightCm)||!lw){toast('Fill in sex, age and height, and log a weight first.');return}
+    const t=calcTargets({kg:lw.kg,heightCm:d.heightCm,age:d.age,sex:d.sex,days:num(d.gymMin)||num(d.weekly)||3,goal:d.goalType||'gain',exp:d.experience});
+    Object.assign(setDraft,{kcal:t.kcal,protein:t.protein,carbs:t.carbs,fat:t.fat});render();toast(`${t.kcal} kcal, ${t.protein} g protein. Save to keep it.`)},
+  saveSet:async()=>{const s=clean(setDraft);['kcal','protein','carbs','fat','goalKg','weekly','gymMin','stepGoal'].forEach(k=>{const v=num(s[k]);s[k]=v==null?DEFAULTS[k]:v});['age','heightCm'].forEach(k=>{if(s[k]!=null&&s[k]!==''){const v=num(s[k]);s[k]=v==null?S.settings[k]:v}});if(!isDate(s.goalDate))s.goalDate=DEFAULTS.goalDate;['workStart','workEnd'].forEach(k=>{if(s[k]&&hm(s[k])==null)s[k]=DEFAULTS[k]});if(String(setDraft.ouraSheetId||'').trim()&&!sheetIdFrom(setDraft.ouraSheetId)){toast('That doesn’t look like a Google Sheet link or ID. Paste the full link from the sheet’s address bar.');return}s.ouraSheetId=sheetIdFrom(s.ouraSheetId);s.confirmed=true;s.stack=s.stack.filter(x=>x.name&&x.name.trim()).map(x=>({name:x.name.trim(),dose:(x.dose||'').trim(),when:(x.when||'').trim()}));
     const newSheet=s.ouraSheetId&&s.ouraSheetId!==S.settings.ouraSheetId;
     if(await safe(()=>saveSettings(s),'Setup saved')){setDraft=clean(S.settings);render();if(newSheet)syncOuraSheet(true)}},
   syncOura:()=>syncOuraSheet(true),
-  resync:()=>{if(!S.settings.ouraSheetId){toast('Link your Oura sheet in Setup first');tab='setup';render();return}syncOuraSheet(true)},
+  resync:()=>{if(isFriend()){friendSync(true);return}if(!S.settings.ouraSheetId){toast('Link your Oura sheet in Setup first');tab='setup';render();return}syncOuraSheet(true)},
   openChat:()=>openChat(),chatSend:()=>chatSend(),chatAsk:b=>chatSend(b.dataset.q),chatClear:()=>{chat=[];chatSave();render()},
   genDaily:()=>genDaily(true),callHistory:()=>openHistory(),callToggle:()=>{callOpen=!callOpen;render()},
   resetSet:()=>{setDraft=clean(S.settings);render()},
@@ -2479,12 +3013,16 @@ document.addEventListener('keydown',e=>{
   if(e.key==='Escape'&&!$('#sheet').hidden)requestClose();
   if(e.key==='Tab'&&!$('#sheet').hidden){const f=[...$('#sheet').querySelectorAll('button,input,select,textarea,summary,[tabindex]:not([tabindex="-1"])')].filter(x=>!x.disabled&&x.offsetParent!==null);if(f.length){const a=f[0],z=f[f.length-1];if(e.shiftKey&&document.activeElement===a){e.preventDefault();z.focus()}else if(!e.shiftKey&&document.activeElement===z){e.preventDefault();a.focus()}else if(!$('#sheet').contains(document.activeElement)){e.preventDefault();a.focus()}}}
   if(e.key==='Enter'&&e.target.id==='wIn'){e.preventDefault();A.saveW()}
+  if(e.key==='Enter'&&(e.target.id==='jnCode'||e.target.id==='jnName')){e.preventDefault();(e.target.id==='jnCode'?A.jnCode:A.jnName)()}
 });
 document.addEventListener('input',e=>{
   if(e.target.id==='fsQ'){foodSearch(e.target.value);return}
   if(e.target.id==='ovR'){ovPos=+e.target.value;const t=document.querySelector('.ov-top'),l=document.querySelector('.ov-line');if(t)t.style.clipPath=`inset(0 0 0 ${ovPos}%)`;if(l)l.style.left=ovPos+'%';return}
   if(e.target.id==='againQ'){const q=e.target.value.trim().toLowerCase();document.querySelectorAll('.again-l li').forEach(l=>{l.hidden=q?!l.dataset.q.includes(q):(!againAll&&l.classList.contains('more-row'))});const x=document.querySelector('.again-all');if(x)x.hidden=!!q;return}
   if(e.target.id==='chatIn'){chatDraft=e.target.value;return}
+  if(e.target.dataset.jn){JN[e.target.dataset.jn]=e.target.value;return}
+  if(e.target.dataset.ob){obInit()[e.target.dataset.ob]=e.target.value;saveOB();return}
+  if(e.target.dataset.obt&&OB&&OB.t){OB.t[e.target.dataset.obt]=e.target.value;saveOB();return}
   const el=e.target,ds=el.dataset;
   if($('#sheet').contains(el)&&!['sumDays','sumDetail'].includes(el.id))sheetDirty=true;
   if(ds.k!==undefined&&ds.wi!==undefined&&drafts){const w=drafts[+ds.wi];if(!w)return;const t=ds.ei!==undefined?w.exercises[+ds.ei]:w;if(t)t[ds.k]=ds.t==='n'?num(el.value):el.value}
