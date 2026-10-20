@@ -1888,7 +1888,9 @@ async function importHealth(rows){
     if(r.type==='weight'){const v=num(r.value);if(v==null||v<30||v>250||S.weights[date])continue;
       try{await put('weights',date,{kg:Math.round(v*100)/100,t:Date.parse(r.start)||Date.now(),src:'health'});n++}catch(e){}continue}
     if(r.type!=='workout'||!STRENGTH.test(r.name||''))continue;
-    const mins=num(r.mins??r.value),kc=num(r.kcal),kcal=kc>0?kc:null;if(!mins||mins<15)continue; // 0 kcal = logged without the watch: unknown, not zero
+    const mins=num(r.mins??r.value),kc=num(r.kcal),kcal=kc>0?kc:null;
+    // under 30 min from Health is an opened-and-closed Fitbod workout, not a session; drop any we stood in earlier
+    if(!mins||mins<30){const hid='health-'+String(r.start||'').replace(/[^0-9]/g,'').slice(0,12);if(S.workouts[hid]&&S.workouts[hid].source==='health'){try{await del('workouts',hid);n++}catch(e){}}continue} // 0 kcal = logged without the watch: unknown, not zero
     const id='health-'+String(r.start||'').replace(/[^0-9]/g,'').slice(0,12),gyms=Object.entries(S.workouts).filter(([k,w])=>w.date===date&&w.kind==='gym'&&w.source!=='health');
     if(gyms.length){const [gid,g]=gyms.find(([,w])=>w.mins==null||w.kcal==null)||[];
       if(gid){try{await put('workouts',gid,{...clean(g),mins:g.mins??Math.round(mins),kcal:g.kcal??(kcal!=null?Math.round(kcal):null)});n++}catch(e){}}
