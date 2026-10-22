@@ -752,8 +752,12 @@ window.addEventListener('online',flush);
 let lastGasLoad=0;document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&mode==='gas'){flush();if($('#sheet').hidden&&Date.now()-lastGasLoad>3e5){lastGasLoad=Date.now();gasLoad()}}});
 // Claude through the backend: same shape as claude.ai's sample (AI(input, opts) → {text}; AI.json → parsed)
 function gasAI(){
+  const b64=f=>new Promise((res,rej)=>{const fr=new FileReader();fr.onload=()=>res(String(fr.result).split(',')[1]);fr.onerror=rej;fr.readAsDataURL(f)});
   const call=async(input,opts={})=>{
-    const messages=typeof input==='string'?[{role:'user',content:input}]:input.map(m=>({role:m.role,content:m.content}));
+    let messages=typeof input==='string'?[{role:'user',content:input}]:input.map(m=>({role:m.role,content:m.content}));
+    if(opts.images&&opts.images.length&&typeof input==='string'){ // photos go first, then the instructions
+      const imgs=await Promise.all(opts.images.map(async f=>({type:'image',source:{type:'base64',media_type:/png|webp|gif/.test(f.type)?f.type:'image/jpeg',data:await b64(f)}})));
+      messages=[{role:'user',content:[...imgs,{type:'text',text:input}]}]}
     const r=await gas('ai',{messages,effort:opts.modelTier==='quick'?'low':'medium',max_tokens:opts.json?12000:4000},'',opts.signal);
     if(r.spent!=null&&ME&&ME.ai){ME.ai.spent=r.spent;saveMe()}
     if(opts.onText)try{opts.onText({text:r.text,delta:r.text})}catch(e){}
@@ -796,7 +800,7 @@ let AI=null,IMG=false,MAXIMG=1;
 let ASSETS=null;
 async function initAssets(){if(useGas()){ASSETS=gasAssets();schedule();return}if(!(window.claude&&typeof window.claude.use==='function'))return;try{ASSETS=await window.claude.use('assets')}catch(e){ASSETS=null}if(ASSETS)schedule()}
 async function initAI(){
-  if(useGas()){AI=gasAI();IMG=false;schedule();return}
+  if(useGas()){AI=gasAI();IMG=true;MAXIMG=3;schedule();return} // Claude reads photos through the backend too
   if(!(window.claude&&typeof window.claude.use==='function'))return;
   let s=null;try{s=await window.claude.use('sample')}catch(e){}
   if(!s)return;AI=s;
@@ -1080,7 +1084,7 @@ let planAll=false;
 let tab='today',sel=today(),exSel=null,setDraft=null;
 const _norm=o=>JSON.stringify(o,(k,v)=>typeof v==='number'?String(v):v);
 const setDirty=()=>!!setDraft&&_norm(setDraft)!==_norm(S.settings);
-let drafts=null,mealDraft=null,scanFiles=[],mealFile=null,ouraFiles=[],ouraShots=[],coachCtl=null;
+let drafts=null,mealDraft=null,scanFiles=[],mealFiles=[],ouraFiles=[],ouraShots=[],coachCtl=null;
 let queued=false;
 function schedule(){if(queued)return;queued=true;requestAnimationFrame(()=>{queued=false;render()})}
 function toast(m,undo,label='Undo'){const t=$('#toast');t.innerHTML=esc(m)+(undo?`<button class="tbtn" data-a="toastUndo">${esc(label)}</button>`:'');toast._undo=undo||null;t.hidden=false;t.classList.remove('show');void t.offsetWidth;t.classList.add('show');clearTimeout(toast._t);toast._t=setTimeout(()=>{t.hidden=true;toast._undo=null},undo?7000:/couldn|problem|isn’t|didn|not /i.test(m)?6000:3500)}
@@ -1532,7 +1536,7 @@ function requestClose(){
   b.innerHTML='<span>Discard what you’ve entered?</span><button class="btn small" data-a="keepSheet">Keep editing</button><button class="btn small primary" data-a="discardSheet">Discard</button>';
   $('#sheetBody').prepend(b);$('.sheet').scrollTop=0;b.querySelector('[data-a=discardSheet]').focus({preventScroll:true});
 }
-function closeSheet(){sheetDirty=false;if(coachCtl){coachCtl.abort();coachCtl=null}const w=$('#sheet');w.classList.remove('in');setTimeout(()=>{if(!w.classList.contains('in')){w.hidden=true;$('#sheetBody').innerHTML=''}},230);document.body.style.overflow='';drafts=null;mealDraft=null;scanFiles=[];mealFile=null;ouraFiles=[];ouraShots=[];bodyFiles=[];Object.values(bodyNew).forEach(x=>URL.revokeObjectURL(x.url));bodyNew={};if(sheetOpener&&document.contains(sheetOpener))sheetOpener.focus({preventScroll:true});sheetOpener=null}
+function closeSheet(){sheetDirty=false;if(coachCtl){coachCtl.abort();coachCtl=null}const w=$('#sheet');w.classList.remove('in');setTimeout(()=>{if(!w.classList.contains('in')){w.hidden=true;$('#sheetBody').innerHTML=''}},230);document.body.style.overflow='';drafts=null;mealDraft=null;scanFiles=[];mealFiles=[];ouraFiles=[];ouraShots=[];bodyFiles=[];Object.values(bodyNew).forEach(x=>URL.revokeObjectURL(x.url));bodyNew={};if(sheetOpener&&document.contains(sheetOpener))sheetOpener.focus({preventScroll:true});sheetOpener=null}
 const XI='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>';
 const head=t=>`<div class="sh-h"><h2 id="sheetTitle">${t}</h2><button class="x" data-a="close" aria-label="Close">${XI}</button></div>`;
 const busy=t=>`<span class="spin" aria-hidden="true"></span>${t}`;
@@ -1615,7 +1619,7 @@ async function saveClass(id){
 
 /* meals */
 function openMeal(existing){
-  mealFile=null;
+  mealFiles=[];
   const h=new Date().getHours();
   mealDraft=existing?clean(existing):{at:sel===today()?hhmm():'',date:sel,slot:sel!==today()?'Lunch':h<11?'Breakfast':h<16?'Lunch':h<18?'Snack':'Dinner',title:'',items:[],desc:''};
   renderMeal();
@@ -1627,9 +1631,10 @@ function renderMeal(){
   openSheet(head(m.id?'Edit meal':'Log a meal')+(rec.length?againHTML():'')+`<div class="g2"><label>Meal<select id="m_slot">${SLOTS.map(s=>`<option${m.slot===s?' selected':''}>${s}</option>`).join('')}</select></label><label>Date<input type="date" id="m_date" value="${esc(m.date)}"></label></div>
   <label style="margin-top:8px">Time eaten<input type="time" id="m_at" value="${esc(m.at||'')}"></label>
   ${!hasClaude()?`<div class="fsearch"><label>Add a food<input id="fsQ" type="search" placeholder="Search: pechuga pollo, avena, skyr…" autocomplete="off"></label><div id="fsOut"></div></div>`:''}
-  ${AI&&!m.items.length?`${IMG?`<label class="drop snap"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h3l2-3h6l2 3h3v13H4z"/><circle cx="12" cy="13" r="4"/></svg><span>${mealFile?'Photo added · tap to change':'Snap your meal'}</span><small>Claude estimates the macros from the photo</small><input type="file" id="mealPhoto" accept="image/*"></label>`:`<p class="note">${NOIMG}</p>`}
-    <label style="margin-top:8px">${IMG?'Anything the photo won’t show? (optional)':'What did you eat?'}<textarea id="m_desc" placeholder="e.g. 200 g chicken thigh, rice cooked in olive oil, a whey shake">${esc(m.desc||'')}</textarea></label>
-    <div class="actions"><button class="btn primary" data-a="estMeal" id="estGo">Estimate with Claude</button><button class="btn ghost" data-a="manualMeal">Enter numbers myself</button></div><p class="note" id="mealMsg" aria-live="polite"></p>`:''}
+  ${AI&&!m.items.length?`${IMG?`<label class="drop snap"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h3l2-3h6l2 3h3v13H4z"/><circle cx="12" cy="13" r="4"/></svg><span>${mealFiles.length?mealFiles.length+' photo'+(mealFiles.length>1?'s':'')+' added · tap to add or change':'Photo of the meal or its label'}</span><small>The plate, the pack, or the nutrition label (up to ${MAXIMG}). Labels are copied exactly.</small><input type="file" id="mealPhoto" accept="image/*" multiple></label>
+      <div class="thumbs" id="mThumbs"></div>`:`<p class="note">${NOIMG}</p>`}
+    <label style="margin-top:8px">${IMG?'Add details (optional)':'What did you eat?'}<textarea id="m_desc" placeholder="${IMG?'e.g. I ate half the pack · about 150 g · cooked in olive oil · plus a whey shake':'e.g. 200 g chicken thigh, rice cooked in olive oil, a whey shake'}">${esc(m.desc||'')}</textarea></label>
+    <div class="actions"><button class="btn primary" data-a="estMeal" id="estGo">${IMG?'Estimate':'Estimate with Claude'}</button><button class="btn ghost" data-a="manualMeal">Enter numbers myself</button></div><p class="note" id="mealMsg" aria-live="polite">${mealFiles.length?'Add details if the photo doesn’t show everything, then tap Estimate.':''}</p>`:''}
   ${m.items.length||!AI?`<label style="margin-top:8px">Name<input id="m_title" value="${esc(m.title)}" placeholder="Chicken rice bowl"></label>
     <div id="mItems">${m.items.map((it,i)=>`<div class="mi"><input data-mi="${i}" data-mk="name" value="${esc(it.name)}" placeholder="Food" aria-label="Food"><button class="x-sm" data-a="rmItem" data-i="${i}" aria-label="Remove item">${XI}</button>
       <div class="nums">${['kcal','protein','carbs','fat'].map(k=>`<label>${k==='kcal'?'kcal':k[0].toUpperCase()+k.slice(1)+' g'}<input type="text" inputmode="decimal" autocomplete="off" step="any" data-mi="${i}" data-mk="${k}" data-t="n" value="${it[k]??''}"></label>`).join('')}</div>
@@ -1637,21 +1642,30 @@ function renderMeal(){
     <div class="actions"><button class="btn small" data-a="addItem">Add item</button></div>
     <p class="total" id="mTotal"></p>${m.note?`<p class="note">${esc(m.note)}</p>`:''}
     <div class="actions"><button class="btn primary" data-a="saveMeal">Save meal</button>${m.id?`<button class="btn ghost danger" data-a="delMeal">Delete</button>`:''}</div>`:''}`);
+  if(mealFiles.length)thumbs('#mThumbs',mealFiles);
   updateMealTotal();
 }
 function syncMealHead(){const s=$('#m_slot'),d=$('#m_date'),t=$('#m_title'),de=$('#m_desc'),at=$('#m_at');if(at)mealDraft.at=at.value;if(s)mealDraft.slot=s.value;if(d&&isDate(d.value))mealDraft.date=d.value;if(t)mealDraft.title=t.value;if(de)mealDraft.desc=de.value}
 function updateMealTotal(){const el=$('#mTotal');if(!el||!mealDraft)return;const x=mealTotals(mealDraft);el.textContent=`${Math.round(x.kcal)} kcal, ${Math.round(x.p)} g protein, ${Math.round(x.c)} g carbs, ${Math.round(x.f)} g fat`}
 async function estMeal(){
   syncMealHead();const desc=(mealDraft.desc||'').trim();const msg=$('#mealMsg'),go=$('#estGo');
-  if(!desc&&!mealFile){msg.textContent='Describe the meal or add a photo first.';return}
+  if(!desc&&!mealFiles.length){msg.textContent='Add a photo or describe the meal first.';return}
   go.disabled=true;msg.classList.remove('err');msg.innerHTML=busy('Estimating…');
   const prompt=`Estimate the nutrition of a meal for a calorie tracker. The person: ${whereText(S.settings)} (local supermarket products and portions), a ${personText(S.settings)}.
-Description: """${desc||'(none, use the photo)'}"""${mealFile?'\nA photo of the meal is attached. Use it to judge what it is and the portion sizes.':''}
-Split it into sensible items. Be realistic rather than optimistic: count cooking oil, sauces and drinks when they're implied. When an amount is given, use it exactly. Round kcal to whole numbers and macros to one decimal.
-Reply with only JSON: {"title":"short meal name","items":[{"name":"Chicken thigh, grilled","amount":"200 g","kcal":350,"protein":48,"carbs":0,"fat":17}],"note":"one short sentence on the biggest uncertainty, or empty string"}`;
+Their note: """${desc||'(none, use the photos)'}"""${mealFiles.length?`\n${mealFiles.length} photo${mealFiles.length>1?'s are':' is'} attached. A photo can show a plate of food, a packaged product, or a nutrition label; use the note together with the photos.`:''}
+Rules:
+- NUTRITION LABEL visible (a table with per 100 g / per serving values): copy the label's numbers exactly, never estimate them. Scale to the amount eaten: the amount in the note if given (grams, "half the pack", "2 slices", "one bar"); otherwise one serving as printed, or the whole pack if it is single-serve. For that item also return per100 (the label's per-100 g values) and grams (the amount eaten in grams), and name the product with its brand if readable. Say in the note which amount you assumed when the note didn't give one.
+- PACKAGED PRODUCT without a readable label: identify it and use typical values for that product.
+- PLATE OF FOOD: identify the foods and judge portion sizes from the plate, cutlery and hands. Be realistic rather than optimistic: count cooking oil, sauces and drinks when they're implied.
+- Anything in the note wins over what the photo suggests (amounts, hidden ingredients, what was left over).
+Split it into sensible items. Round kcal to whole numbers and macros to one decimal.
+Reply with only JSON: {"title":"short meal name","items":[{"name":"Chicken thigh, grilled","amount":"200 g","kcal":350,"protein":48,"carbs":0,"fat":17,"per100":null,"grams":null}],"note":"one short sentence on the biggest uncertainty or assumption, or empty string"}`;
   try{
-    const r=await AI.json(prompt,mealFile?{images:[mealFile]}:{});
-    const items=(r&&Array.isArray(r.items)?r.items:[]).map(i=>({name:String(i.name||'Item'),amount:i.amount?String(i.amount):'',kcal:num(i.kcal),protein:num(i.protein),carbs:num(i.carbs),fat:num(i.fat)}));
+    const r=await AI.json(prompt,mealFiles.length?{images:mealFiles}:{});
+    const items=(r&&Array.isArray(r.items)?r.items:[]).map(i=>{const o={name:String(i.name||'Item'),amount:i.amount?String(i.amount):'',kcal:num(i.kcal),protein:num(i.protein),carbs:num(i.carbs),fat:num(i.fat)};
+      // a label item keeps its per-100 g values, so the Grams field rescales it
+      const p=i.per100,g=num(i.grams);if(p&&num(p.kcal)!=null&&g>0){o.p100={k:num(p.kcal),p:num(p.protein)||0,c:num(p.carbs)||0,f:num(p.fat)||0};o.amount=g+' g'}
+      return o});
     if(!items.length)throw{code:'invalid_json'};
     sheetDirty=true;mealDraft.items=items;mealDraft.title=mealDraft.title||String(r.title||'');mealDraft.note=r.note?String(r.note):'';renderMeal();
   }catch(e){msg.textContent=aiErr(e);msg.classList.add('err');go.disabled=false}
@@ -3239,7 +3253,8 @@ document.addEventListener('change',e=>{
   const el=e.target;
   if(el.id==='exPick'){exSel=el.value;render();return}
   if(el.id==='scanIn'){scanFiles=[...el.files].slice(0,MAXIMG);thumbs('#thumbs',scanFiles);$('#scanGo').disabled=!scanFiles.length;if(scanFiles.length){sheetDirty=true;Promise.all(scanFiles.map(f=>shrinkImage(f,2200))).then(fs=>{scanFiles=fs;runScan()})}if(el.files.length>MAXIMG)$('#scanMsg').textContent=`Using the first ${MAXIMG}; scan the rest after.`;return}
-  if(el.id==='mealPhoto'){syncMealHead();const f=el.files[0];if(!f)return;sheetDirty=true;const sp=el.parentElement.querySelector('span');if(sp)sp.textContent='Photo added · reading it…';shrinkImage(f).then(x=>{mealFile=x;estMeal()});return}
+  if(el.id==='mealPhoto'){syncMealHead();const fs=[...el.files];if(!fs.length)return;sheetDirty=true;el.value='';
+    Promise.all(fs.map(f=>shrinkImage(f))).then(xs=>{mealFiles=[...mealFiles,...xs].slice(-MAXIMG);renderMeal();thumbs('#mThumbs',mealFiles);const d=$('#m_desc');if(d&&window.matchMedia('(pointer:fine)').matches)d.focus()});return}
   if(el.id==='ouraShot'){ouraShots=[...el.files].slice(0,MAXIMG);thumbs('#oThumbs',ouraShots);$('#oGo').disabled=!ouraShots.length;return}
   if(el.id==='fbFile'){const f=el.files[0];if(!f)return;$('#fbOut').innerHTML=`<p class="note">${busy('Reading file…')}</p>`;f.text().then(t=>{fbParsed=parseFitbod(t);fbPreview()}).catch(()=>{fbParsed={error:'Couldn’t read that file.'};fbPreview()});return}
   if(el.id==='fbRep'){fbReplace=el.checked;return}
