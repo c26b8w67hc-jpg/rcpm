@@ -585,7 +585,7 @@ const hhmm=(d=new Date())=>pad(d.getHours())+':'+pad(d.getMinutes());
 const mondayOf=s=>addDays(s,-((parseYmd(s).getDay()+6)%7));
 
 const KINDS={
-  gym:{label:'Gym',c:'var(--gym)'},lagree:{label:'Lagree',c:'var(--mint)'},run:{label:'Run',c:'var(--cobalt)'},
+  gym:{label:'Gym',c:'var(--gym)'},lagree:{get label(){return isFriend()?'Pilates':'Lagree'},c:'var(--mint)'},run:{label:'Run',c:'var(--cobalt)'},
   spin:{label:'Spin',c:'var(--violet)'},barrys:{label:"Barry's",c:'var(--crimson)'},walk:{label:'Walk',c:'var(--stone)'},other:{label:'Other',c:'var(--muted)'}
 };
 const SLOTS=['Breakfast','Lunch','Dinner','Snack','Pre-workout','Post-workout'];
@@ -771,7 +771,8 @@ function ix(){
   if(_ix.v===dataVer&&_ix.ws===S.workouts&&_ix.ms===S.meals&&_ix.os===S.oura)return _ix;
   const w={},m={};
   for(const [id,x] of Object.entries(S.workouts))if(countsW(x))(w[x.date]||(w[x.date]=[])).push({id,...x});
-  for(const k in w){if(w[k].some(x=>x.source==='health')&&w[k].some(x=>x.kind==='gym'&&x.source!=='health'))w[k]=w[k].filter(x=>x.source!=='health'); // Fitbod's own log beats its Health echo
+  for(const k in w){if(w[k].some(x=>x.source==='oura'))w[k]=w[k].filter(x=>!(x.source==='fitbod-csv'&&x.kind!=='gym'&&w[k].some(y=>y.source==='oura'&&y.kind===x.kind))); // the same run from Fitbod and the watch counts once
+    if(w[k].some(x=>x.source==='health')&&w[k].some(x=>x.kind==='gym'&&x.source!=='health'))w[k]=w[k].filter(x=>x.source!=='health'); // Fitbod's own log beats its Health echo
     w[k].sort((a,b)=>(a.t||0)-(b.t||0))}
   for(const [id,x] of Object.entries(S.meals))(m[x.date]||(m[x.date]=[])).push({id,...x});
   for(const k in m)m[k].sort((a,b)=>SLOTS.indexOf(a.slot)-SLOTS.indexOf(b.slot)||(a.t||0)-(b.t||0));
@@ -1095,8 +1096,10 @@ const FBN_KEY='recomplog.fbNudge';
 const noExercises=w=>w.kind==='gym'&&!(w.exercises||[]).some(e=>e&&e.name);
 function missingGym(){const t=today();return [...Array(14)].map((_,i)=>addDays(t,-i)).flatMap(d=>workoutsOn(d).filter(noExercises)).sort((a,b)=>a.date.localeCompare(b.date))}
 // Data freshness: silent while everything flows; one warning once something is more than a day old.
-function staleAlarm(){const frO=isFriend()&&ME&&ME.oura&&ME.oura.connected;if(!S.settings.ouraSheetId&&!frO)return '';const now=Date.now(),t=today(),issues=[];
-  if(frO&&ME.oura.err)issues.push('Oura stopped syncing: reconnect it in Setup.');
+function staleAlarm(){if(isFriend()){const hl=ME&&ME.health&&ME.health.last,ht=hl?Date.parse(String(hl).replace(' ','T')):0;
+    if(!hl||Date.now()-ht<2*864e5)return '';
+    return `<section class="nudge"><div class="nudge-t"><b>Apple Health went quiet</b><small>Nothing has arrived since ${esc(ago2(hl))}. Open Health Auto Export once so it can send again.</small></div><div class="nudge-a"><button class="btn small primary" data-a="resync">Sync now</button></div></section>`}
+  if(!S.settings.ouraSheetId)return '';const now=Date.now(),t=today(),issues=[];
   const l=lastOuraSync();if(ouraSyncBad&&ouraSyncMsg)issues.push(esc(ouraSyncMsg));
   else if(!l||now-l.at>864e5){const h=l?Math.round((now-l.at)/36e5):0,d=Math.round(h/24);issues.push(`The app last pulled your data ${!l?'never':h<48?h+' hours ago':d+' days ago'}.`)}
   const od=Object.keys(S.oura).filter(d=>isDate(d)&&(S.oura[d].readiness!=null||S.oura[d].sleepScore!=null)).sort().pop();
@@ -1145,8 +1148,14 @@ function sceneSVG(ph){const P=PHASES[ph];let stars='';
   <path d="M0 290 C60 262 110 270 160 282 S260 300 310 276 S380 262 400 270 V420 H0Z" fill="${P.mid}"/>
   <path d="M0 330 C70 306 140 318 200 326 S320 340 400 312 V420 H0Z" fill="${P.near}"/></svg>`}
 function scoreState(v){return v==null?null:v>=85?['Optimal','var(--good)']:v>=70?['Good','var(--ok)']:['Pay attention','var(--warn)']}
-function ringHTML(label,v,p,wait){const st=scoreState(v),C=2*Math.PI*30,off=v==null?C:C*(1-Math.min(100,v)/100);
-  return `<button class="ring" data-a="goProg" data-p="${p}" style="--rc:${st?st[1]:'var(--muted)'};--c:${C.toFixed(1)}"><span class="ring-in"><svg viewBox="0 0 68 68" aria-hidden="true"><circle class="rt" cx="34" cy="34" r="30"/><circle class="rv" cx="34" cy="34" r="30" stroke-dasharray="${C.toFixed(1)}" stroke-dashoffset="${off.toFixed(1)}"/></svg><b>${v??'–'}</b></span><span class="ring-l">${label}</span><span class="ring-s">${st?st[0]:wait?'Waiting for ring':'No data'}</span></button>`}
+function ringHTML(label,v,p,wait,show){const st=scoreState(v),C=2*Math.PI*30,off=v==null?C:C*(1-Math.min(100,v)/100);
+  return `<button class="ring" data-a="goProg" data-p="${p}" style="--rc:${st?st[1]:'var(--muted)'};--c:${C.toFixed(1)}"><span class="ring-in"><svg viewBox="0 0 68 68" aria-hidden="true"><circle class="rt" cx="34" cy="34" r="30"/><circle class="rv" cx="34" cy="34" r="30" stroke-dasharray="${C.toFixed(1)}" stroke-dashoffset="${off.toFixed(1)}"/></svg><b>${show??v??'–'}</b></span><span class="ring-l">${label}</span><span class="ring-s">${show!==undefined?(v==null?(wait?'Not in yet':'No data'):v>=100?'Done':`${Math.round(v)}%`):st?st[0]:wait?'Waiting for ring':'No data'}</span></button>`}
+// without a ring there are no scores: sleep hours, steps and protein, each against its target
+const hasScores=()=>Object.values(S.oura).some(o=>o&&(o.readiness!=null||o.sleepScore!=null));
+function plainRings(d){const st=S.settings,o=S.oura[d]||{},sh=num(o.sleepHours),sn=num(o.steps),g=st.stepGoal||10000,p=dayTotals(d).p,w=d===today();
+  return ringHTML('Sleep',sh==null?null:Math.min(100,sh/8*100),'recovery',w,sh==null?undefined:r1(sh)+'h')
+    +ringHTML('Steps',sn==null?null:Math.min(100,sn/g*100),'recovery',w,sn==null?undefined:(sn>=1000?r1(sn/1000)+'k':String(sn)))
+    +ringHTML('Protein',Math.min(100,p/st.protein*100),'food',w,Math.round(p)+'g')}
 function dropBlock(d){
   const st=S.settings,t=today(),o=S.oura[d]||{},ph=phaseNow(),rd=num(o.readiness),s=scoreState(rd);
   const h=new Date().getHours(),hi=h<5?'Still up':h<12?'Good morning':h<18?'Good afternoon':'Good evening';
@@ -1156,7 +1165,7 @@ function dropBlock(d){
     <div class="scene">${sceneSVG(ph)}<i class="tint" style="background:${tint}"></i></div>
     <p class="hero-date">${parseYmd(d).toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long'})} · ${st.goalKg} kg in ${wk} weeks</p>
     ${d===t?`<h2 class="hero-hi">${hi}${st.name?`, <em>${esc(st.name)}</em>`:''}</h2>`:`<h2 class="hero-hi">${(()=>{const n=dayNum(t)-dayNum(d);return n===1?'Yesterday':n<7?n+' days ago':parseYmd(d).toLocaleDateString('en-GB',{weekday:'long'})})()}</h2>`}
-    <div class="rings">${ringHTML('Readiness',rd,'recovery',d===t)}${ringHTML('Sleep',num(o.sleepScore),'recovery',d===t)}${ringHTML('Activity',num(o.activityScore),'training',d===t)}</div>
+    <div class="rings">${isFriend()&&!hasScores()?plainRings(d):ringHTML('Readiness',rd,'recovery',d===t)+ringHTML('Sleep',num(o.sleepScore),'recovery',d===t)+ringHTML('Activity',num(o.activityScore),'training',d===t)}</div>
     ${d===t?dailyCard():''}
   </section>`;
 }
@@ -1170,7 +1179,7 @@ function todoList(d){
     {k:'protein',done:t.p>=st.protein,label:'Hit protein',detail:`${Math.round(t.p)} / ${st.protein} g`,act:''},
     {k:'train',done:ws.length>0,label:'Train',detail:ws.length?ws.map(x=>esc((KINDS[x.kind]||KINDS.other).label)+(x.mins?' '+x.mins+' min':'')).join(', '):(d===today()?'Nothing logged yet':'Rest day'),act:''},
     {k:'stack',done:nT>=nS,label:'Supplements',detail:`${nT} of ${nS} taken`,act:''},
-    ...((()=>{const g=st.stepGoal||10000,n=num((S.oura[d]||{}).steps);return n==null&&d!==today()?[]:[{k:'steps',done:n!=null&&n>=g,label:`${Math.round(g/1000)}k steps`,detail:n!=null?`${n.toLocaleString('en-GB')} / ${g.toLocaleString('en-GB')}${n<g&&d===today()?` · ${(g-n).toLocaleString('en-GB')} to go`:''}`:'Waiting for the ring',act:''}]})())
+    ...((()=>{const g=st.stepGoal||10000,n=num((S.oura[d]||{}).steps);return n==null&&d!==today()?[]:[{k:'steps',done:n!=null&&n>=g,label:`${Math.round(g/1000)}k steps`,detail:n!=null?`${n.toLocaleString('en-GB')} / ${g.toLocaleString('en-GB')}${n<g&&d===today()?` · ${(g-n).toLocaleString('en-GB')} to go`:''}`:isFriend()?'Waiting for Apple Health':'Waiting for the ring',act:''}]})())
   ];
   if(parseYmd(d).getDay()===0){const b=S.body[d]||{},np=(b.photos||[]).length;items.push({k:'body',done:b.waist!=null&&(np>0||!ASSETS),label:'Sunday check-in',detail:[b.waist!=null?'Measured':'Waist and neck',ASSETS?(np?np+' photo'+(np>1?'s':''):'photos'):''].filter(Boolean).join(' · '),act:''})}
   const nd=items.filter(x=>x.done).length,ord=items; // fixed order: rows never move under the thumb
@@ -1209,12 +1218,12 @@ function logCard(d){
 }
 function recoveryLine(d){
   const o=S.oura[d];
-  const bits=o?[['sleepScore','Sleep'],['readiness','Readiness'],['hrv','HRV'],['sleepHours','']].filter(([k])=>o[k]!=null).map(([k,l])=>k==='sleepHours'?`<span>Slept <b class="num">${r1(o[k])}</b> h</span>`:`<span>${l} <b class="num">${esc(o[k])}</b></span>`):[];
+  const bits=o?[['sleepScore','Sleep'],['readiness','Readiness'],['hrv','HRV'],['rhr','Resting HR'],['sleepHours','']].filter(([k])=>o[k]!=null).map(([k,l])=>k==='sleepHours'?`<span>Slept <b class="num">${r1(o[k])}</b> h</span>`:`<span>${l} <b class="num">${esc(o[k])}</b></span>`):[];
   const syncNote=S.settings.ouraSheetId&&d===today()&&(ouraSyncing||ouraSyncBad)?ouraSyncLine():'';
   const sg=S.settings.stepGoal||10000,sn=o?num(o.steps):null;
   return `<div class="lrow" id="sec-steps"><div class="lmain"><h2 class="lab">Recovery</h2>
     ${sn!=null?`<div class="steps-m${sn>=sg?' hit':''}"><span><b class="num">${sn.toLocaleString('en-GB')}</b> steps</span><span class="track"><i data-bar="steps" style="width:${Math.min(100,sn/sg*100).toFixed(1)}%"></i></span></div>`:''}
-    ${bits.length?`<p class="recov-v">${bits.join('')}</p>`:`<p class="meta">${S.settings.ouraSheetId&&d===today()?'No ring data yet today.':'No Oura numbers for this day.'}</p>`}${syncNote}</div>
+    ${bits.length?`<p class="recov-v">${bits.join('')}</p>`:`<p class="meta">${isFriend()?(d===today()?'No sleep data yet today.':'No sleep or heart data for this day.'):S.settings.ouraSheetId&&d===today()?'No ring data yet today.':'No Oura numbers for this day.'}</p>`}${syncNote}</div>
     <button class="btn small ghost" data-a="openOura">${o?'Edit':'Add'}</button></div>`;
 }
 function openPicker(){
@@ -1350,7 +1359,7 @@ recovery(){
       avgBal>150&&rate<-0.05?`The ring says you eat ${avgBal} kcal a day over your burn, yet your weight is dropping ${(-rate).toFixed(2)} kg a week. Your food log is probably missing some calories.`:
       `Food vs ring burn: ${sgn(avgBal)} kcal a day, and the scale agrees (${sgn(+rate.toFixed(2))} kg a week).`}
   return `<section class="card"><div class="card-h"><h2>This week vs your usual</h2><button class="btn small" data-a="openOura">Enter numbers</button></div>${ouraSyncLine()}
-    ${R2.length?`<p class="verdict">${verdict}</p><table class="cmp"><thead><tr><th></th><th>7 days</th><th>Usual</th><th></th></tr></thead><tbody>${R2.map(r=>`<tr><td>${r.l}</td><td><b>${f(r,r.a)}</b>${r.u?' '+r.u:''}</td><td>${f(r,r.b)}</td><td class="tone${r.tone>0?' up':r.tone<0?' down':''}">${r.tone>0?'Better':r.tone<0?'Lower':'Normal'}</td></tr>`).join('')}</tbody></table><p class="note">Usual is your 28-day average.</p>`:`<p class="empty">${S.settings.ouraSheetId||(isFriend()&&ME&&ME.oura&&ME.oura.connected)?'Waiting for the ring’s first week of data.':isFriend()?'No Oura data yet. Connect your ring in Setup, or tap Enter numbers to add a day.':'No Oura data yet. Tap Enter numbers to add a day, or link your Oura sheet in Setup.'}</p>`}
+    ${R2.length?`<p class="verdict">${verdict}</p><table class="cmp"><thead><tr><th></th><th>7 days</th><th>Usual</th><th></th></tr></thead><tbody>${R2.map(r=>`<tr><td>${r.l}</td><td><b>${f(r,r.a)}</b>${r.u?' '+r.u:''}</td><td>${f(r,r.b)}</td><td class="tone${r.tone>0?' up':r.tone<0?' down':''}">${r.tone>0?'Better':r.tone<0?'Lower':'Normal'}</td></tr>`).join('')}</tbody></table><p class="note">Usual is your 28-day average.</p>`:`<p class="empty">${S.settings.ouraSheetId||(isFriend()&&ME&&ME.oura&&ME.oura.connected)?'Waiting for the ring’s first week of data.':isFriend()?'No recovery data yet. Send sleep and heart rate from Apple Health (Setup › Connections), or tap Enter numbers to add a day.':'No Oura data yet. Tap Enter numbers to add a day, or link your Oura sheet in Setup.'}</p>`}
     ${hPts.length>1?`<h3 style="margin-top:16px">HRV, last 45 days</h3>`+lineChart({series:[{pts:hPts,c:'var(--ink)',dots:false,w:2}],h:110,label:'HRV over time',fmt:v=>Math.round(v)}):''}
   </section>
   ${balNote?`<section class="card"><div class="card-h"><h2>Energy balance</h2></div><p style="margin:0">${balNote}</p></section>`:''}`;
@@ -1600,18 +1609,19 @@ const OURA_MAP={sleepscore:'sleepScore',readinessscore:'readiness',activityscore
 const OURA_FIELDS=[['sleepScore','Sleep score'],['readiness','Readiness'],['activityScore','Activity score'],['sleepHours','Hours slept'],['hrv','HRV (ms)'],['rhr','Lowest heart rate'],['steps','Steps'],['totalKcal','Total burn (kcal)'],['activeKcal','Active burn (kcal)']];
 function openOura(){
   ouraFiles=[];ouraShots=[];const o=S.oura[sel]||{},dl=sel===today()?'today':fmtShort(sel);
-  const shot=AI&&IMG?`<h3>Screenshot the Oura app</h3>
+  const shot=AI&&IMG&&!isFriend()?`<h3>Screenshot the Oura app</h3>
     <p class="empty">Screenshot your Sleep, Readiness and Activity screens and Claude reads the numbers into the form below.</p>
     <label class="drop">Choose Oura screenshots<input type="file" id="ouraShot" accept="image/png,image/jpeg,image/webp" multiple></label><div class="thumbs" id="oThumbs"></div>
     <div class="actions"><button class="btn" data-a="readOura" id="oGo" disabled>Read screenshots</button></div><p class="note" id="oMsg" aria-live="polite"></p>`:'';
   const manual=`<h3 style="margin-top:${shot?16:0}px">${shot?'Check':'Type'} ${dl}'s numbers</h3>
-    <div class="g2">${OURA_FIELDS.map(([k,l])=>`<label>${l}<input type="text" inputmode="decimal" autocomplete="off" id="o_${k}" value="${o[k]??''}"></label>`).join('')}</div>
+    <div class="g2">${OURA_FIELDS.filter(([k])=>!isFriend()||!['sleepScore','readiness','activityScore'].includes(k)).map(([k,l])=>`<label>${l}<input type="text" inputmode="decimal" autocomplete="off" id="o_${k}" value="${o[k]??''}"></label>`).join('')}</div>
     <div class="actions"><button class="btn primary" data-a="saveOuraManual">Save for ${dl}</button>${S.oura[sel]?`<button class="btn ghost danger" data-a="delOura">Clear this day</button>`:''}</div>`;
-  openSheet(head('Oura data')+(S.settings.ouraSheetId?`<p class="empty" style="margin:0 0 12px">Auto-sync from your Oura sheet is on, so this is only for fixing a day by hand.</p>`:'')+shot+manual+`
+  const fr=isFriend();
+  openSheet(head(fr?'Recovery numbers':'Oura data')+(S.settings.ouraSheetId?`<p class="empty" style="margin:0 0 12px">Auto-sync from your Oura sheet is on, so this is only for fixing a day by hand.</p>`:'')+shot+manual+(fr?'':`
   <details class="more"><summary>Import your full Oura history</summary>
   <ol class="steps"><li>Sign in to the Oura Membership Hub on Oura's website.</li><li>Open Export data and request your data. Oura emails you when it's ready, which can take a few days.</li><li>Download and unzip it, then pick the CSV or JSON files here (daily sleep, daily readiness, daily activity and sleep are the useful ones).</li></ol>
   <label class="drop">Choose export files<input type="file" id="ouraFile" accept=".csv,.json,text/csv,application/json" multiple></label>
-  <p class="note" id="oImp" aria-live="polite"></p></details>`);
+  <p class="note" id="oImp" aria-live="polite"></p></details>`));
 }
 function parseCSV(text){
   text=text.replace(/^\uFEFF/,'');const first=text.split(/\r?\n/)[0]||'';const delim=(first.split(';').length>first.split(',').length)?';':',';
@@ -1851,7 +1861,7 @@ function ouraKind(activity,label){const s=(activity+' '+label).toLowerCase();
 // Only keep what looks like training.
 function ouraKeep(kind,activity,mins,km,source){
   if(kind==='gym'||kind==='walk'||/danc/i.test(activity))return false; // lifting comes from Fitbod
-  if(/workout_heart_rate|manual/i.test(source||''))return mins>=20; // he started it on the ring: it's training
+  if(/workout_heart_rate|manual|health/i.test(source||''))return mins>=20; // started on the ring or the watch: it's training
   if(kind==='spin'&&km>=1)return mins>=60; // outdoor ride with real distance: short ones are commutes (indoor bikes report ~0 km)
   return mins>=(kind==='run'?20:45);
 }
@@ -2772,7 +2782,7 @@ function joinView(){const j=JN,err=j.err?`<p class="note err" role="alert">${esc
   if(j.step==='consent')return `<section class="gate-v">${hero}<section class="card"><h3>Before you start</h3>
     <ul class="steps" style="margin-top:10px"><li>Your log (weight, food, training, recovery, photos) is stored privately in a Google Drive folder that belongs to ${OWNER}, who runs RCMP. Only you and ${OWNER} can technically access it; it isn’t shared with anyone else.</li>
     <li>When you ask the AI coach something, your question and the relevant numbers go to Anthropic’s Claude API to write the answer. Most answers are built in and never leave the app.</li>
-    <li>If you connect Oura or Apple Health, their daily numbers are copied into that same private folder.</li>
+    <li>If you connect Apple Health, the numbers it sends (steps, weight, sleep, heart rate, workouts) are copied into that same private folder.</li>
     <li>Ask ${OWNER} any time to export or delete your data.</li></ul>${err}
     <div class="actions"><button class="btn primary" data-a="jnJoin"${j.busy?' disabled':''}>${j.busy?busy('Creating your account…'):'I agree, create my account'}</button><button class="btn ghost" data-a="jnBack">Back</button></div></section></section>`;
   return `<section class="gate-v">${hero}<section class="card"><h3>Have an invite code?</h3>
@@ -2847,13 +2857,13 @@ let ouraPending=false;
 function ago2(s){if(!s)return '';const t=Date.parse(String(s).replace(' ','T'));return isFinite(t)?ago(t):s}
 function connectionsCard(inWizard){if(!isFriend())return '';const m=ME||{},o=m.oura||{},h=m.health||{},hurl=API?API.url+'?op=health&token='+API.token:'';
   return `<section class="card conn"><div class="card-h"><h2>${inWizard?'Connections':'Your connections'}</h2></div>
-    <div class="conn-r"><div><b>Oura ring</b><small>${o.err?esc(o.err):o.connected?'Connected'+(o.last?' · synced '+esc(ago2(o.last)):''):'Sleep, readiness, HRV, steps and workouts every 30 minutes.'}</small></div>
-      ${o.ready===false?'<small class="aside">Not available yet</small>':`<button class="btn small${o.connected&&!o.err?'':' primary'}" data-a="ouraConnect">${o.connected?'Reconnect':'Connect'}</button>`}</div>
-    <div class="conn-r"><div><b>Apple Health</b><small>${h.last?'Last delivery '+esc(ago2(h.last)):'Steps, weight and strength workouts from your iPhone.'}</small></div><button class="btn small" data-a="healthHow">${healthOpen?'Hide':'Set up'}</button></div>
+    <div class="conn-r"><div><b>Apple Health</b><small>${h.last?'Last delivery '+esc(ago2(h.last)):'Steps, weight, sleep, heart rate and workouts from your iPhone and Apple Watch.'}</small></div><button class="btn small${h.last?'':' primary'}" data-a="healthHow">${healthOpen?'Hide':'Set up'}</button></div>
+    ${o.ready||o.connected?`<div class="conn-r"><div><b>Oura ring</b><small>${o.err?esc(o.err):o.connected?'Connected'+(o.last?' · synced '+esc(ago2(o.last)):''):'If you have one: sleep, readiness and HRV every 30 minutes.'}</small></div>
+      <button class="btn small" data-a="ouraConnect">${o.connected?'Reconnect':'Connect'}</button></div>`:''}
     ${healthOpen?`<div class="conn-how"><label>Your private Health address<input id="hUrl" value="${esc(hurl)}" readonly></label><div class="actions" style="margin-top:8px"><button class="btn small" data-a="copyHealth">Copy address</button></div>
       ${m.shortcut?`<p class="note"><b>Free way, with the RCMP Shortcut:</b></p><ol class="steps"><li><a href="${esc(m.shortcut)}" target="_blank" rel="noopener">Get the RCMP Shortcut</a> and paste the address above when it asks.</li><li>Shortcuts → Automation → New → Time of Day (say 22:00, daily) → Run Shortcut → RCMP Health, and turn off Ask Before Running.</li></ol>`:''}
       <p class="note"><b>${m.shortcut?'Fully automatic':'Automatic'}, with Health Auto Export</b> (an App Store app; automations are its paid feature):</p>
-      <ol class="steps"><li>Automations → New Automation → REST API. Paste the address as the URL.</li><li>Export format JSON, version 2. Data type Health Metrics: Step Count, Weight &amp; Body Mass, Body Fat Percentage. Add a second automation with Workouts if you want your gym sessions’ length and calories.</li><li>Aggregation: Day. Sync cadence: every hour. Turn it on.</li></ol>
+      <ol class="steps"><li>Automations → New Automation → REST API. Paste the address as the URL.</li><li>Export format JSON, version 2. Data type Health Metrics, and pick: Step Count, Weight &amp; Body Mass, Body Fat Percentage, Sleep Analysis, Resting Heart Rate, Heart Rate Variability, Active Energy, Resting Energy. (Sleep and heart need an Apple Watch or a sleep app writing to Health; the rest works with just the iPhone.)</li><li>Make a second automation, the same way, with data type Workouts: your runs, rides and classes then show up as sessions, and gym sessions get their length and calories.</li><li>Aggregation: Day. Sync cadence: every hour. Turn it on.</li></ol>
       <p class="note">Keep the address to yourself: anyone with it could add numbers to your log.</p></div>`:''}
     <div class="conn-r"><div><b>Fitbod</b><small>${Object.values(S.workouts).some(w=>w.source==='fitbod-csv')?'Imported. Export again any time to add new sessions.':'Your lifting history, set by set, from a CSV export.'}</small></div><button class="btn small" data-a="openFitbod">Import CSV</button></div></section>`}
 let healthOpen=false;
@@ -2887,16 +2897,18 @@ function friendsCard(){if(!isOwnerGas())return '';if(!FR.data&&!FR.busy&&!FR.err
   return `<section class="card"><div class="card-h"><h2>Friends</h2><span class="aside">${d?users.length+' of '+d.max:''}</span></div>
     ${FR.busy&&!d?`<p class="note">${busy('Loading…')}</p>`:FR.err?`<p class="note err">${esc(FR.err)} <button class="btn small" data-a="frLoad">Try again</button></p>`:''}
     ${d?`${users.length?`<ul class="list">${users.map(u=>`<li class="item"><div class="body"><div class="t">${esc(u.name)}</div>
-      <div class="s">Opened ${esc(when(u.seen))} · AI $${(u.spent||0).toFixed(2)} of $${(+u.cap).toFixed(2)} · Oura ${u.ouraErr?'needs reconnecting':u.oura?'on':'off'} · Health ${u.healthLast?esc(ago2(u.healthLast)):'off'}</div>
+      <div class="s">Opened ${esc(when(u.seen))} · AI $${(u.spent||0).toFixed(2)} of $${(+u.cap).toFixed(2)} ${u.oura||u.ouraErr?` · Oura ${u.ouraErr?'needs reconnecting':'on'}`:''} · Health ${u.healthLast?esc(ago2(u.healthLast)):'off'}</div>
       <div class="actions" style="margin-top:6px"><button class="btn small" data-a="frRelogin" data-u="${u.uid}">Sign-in code</button><button class="btn small" data-a="frRevoke" data-u="${u.uid}">${FR.ask===u.uid?'Tap again to remove':'Remove'}</button></div></div></li>`).join('')}</ul>`:'<p class="empty">No friends yet. Make an invite and send it.</p>'}
       ${FR.code?`<div class="invite"><p class="lab">${FR.codeFor?'Sign-in code for '+esc(FR.codeFor):'New invite'}</p><p class="invite-c">${esc(FR.code)}</p><p class="note" style="margin-top:4px">${FR.codeFor?'Works once (and again for 24 hours), for 14 days. They enter it on their new phone.':'Works for one person, for 14 days.'}</p>
         <div class="actions"><button class="btn small primary" data-a="frShare">Share invite</button><button class="btn small" data-a="frCopy">Copy message</button></div></div>`:''}
-      ${d.invites.length?`<p class="note">Open codes: ${d.invites.map(i=>`<b>${esc(i.code)}</b>${i.name?' (for '+esc(i.name)+')':''}`).join(', ')}</p>`:''}
-      <div class="actions"><button class="btn primary" data-a="frInvite"${users.length+d.invites.filter(i=>!i.uid).length>=d.max?' disabled':''}>New invite</button></div>
+      ${d.invites.length?`<p class="lab" style="margin-top:14px">Open codes (each holds a place until used, cancelled or 14 days old)</p><ul class="list">${d.invites.map(i=>`<li class="item"><div class="body"><div class="t">${esc(i.code)}</div><div class="s">${i.name?'Sign-in code for '+esc(i.name):'Invite'} · made ${esc(ago(i.created))}</div></div><button class="btn small" data-a="frUninvite" data-c="${esc(i.code)}">Cancel</button></li>`).join('')}</ul>`:''}
+      <div class="actions"><button class="btn primary" data-a="frInvite"${frMaking||users.length+d.invites.filter(i=>!i.uid).length>=d.max?' disabled':''}>${frMaking?busy('Making a code…'):'New invite'}</button></div>
       <label style="margin-top:14px">Shared Apple Health Shortcut link (optional, shown to friends)<input id="frShortcut" value="${esc(d.shortcut||'')}" placeholder="https://www.icloud.com/shortcuts/…"></label>
       <div class="actions" style="margin-top:8px"><button class="btn small" data-a="frShortcut">Save link</button></div>
       <p class="note">Your AI this month: $${d.ownerSpent.toFixed(2)} of $${d.ownerCap}. Each friend gets $0.25; everything else runs on built-in rules.${gone.length?` Removed: ${gone.map(u=>esc(u.name)).join(', ')} (their data stays in Drive).`:''}</p>`:''}</section>`}
-async function frInvite(uid){try{const r=await gas('invite',null,uid?'&uid='+encodeURIComponent(uid):'');FR.code=r.code;FR.codeFor=uid?(FR.data.users.find(u=>u.uid===uid)||{}).name:null;await frLoad()}catch(e){toast(e.code==='full'?'You already have 5 friends (open invites count too).':'Couldn’t make a code: '+(e.message||''))}}
+let frMaking=false;
+async function frInvite(uid){if(frMaking)return;frMaking=true;render();try{const r=await gas('invite',null,uid?'&uid='+encodeURIComponent(uid):'');FR.code=r.code;FR.codeFor=uid?(FR.data.users.find(u=>u.uid===uid)||{}).name:null;await frLoad()}catch(e){toast(e.code==='full'?'You already have 5 friends (open invites count too). Cancel an unused code first.':'Couldn’t make a code: '+(e.message||''))}frMaking=false;render()}
+async function frUninvite(code){try{await gas('uninvite',null,'&code='+encodeURIComponent(code));if(FR.code===code)FR.code=null;toast('Code '+code+' cancelled');await frLoad()}catch(e){toast('Couldn’t cancel it: '+(e.message||''))}}
 async function frRevoke(uid){if(FR.ask!==uid){FR.ask=uid;render();setTimeout(()=>{if(FR.ask===uid){FR.ask=null;schedule()}},4000);return}
   FR.ask=null;try{await gas('revoke',null,'&uid='+encodeURIComponent(uid));toast('Removed. Their data stays in your Drive.');await frLoad()}catch(e){toast('Couldn’t remove: '+(e.message||''))}}
 const signInText=c=>`Your RCMP sign-in code is ${c}. Open RCMP on your phone (${APP_URL}) and enter it. It works for 14 days.`;
@@ -2959,7 +2971,7 @@ const A={
   readdMeal:async b=>{const m=S.meals[b.dataset.id];if(!m)return;const h=new Date().getHours();const d=mealDraft?mealDraft.date:sel,id=newId();if(await safe(()=>put('meals',id,{...clean(m),date:d,slot:d===today()?(h<11?'Breakfast':h<16?'Lunch':h<18?'Snack':'Dinner'):m.slot,t:Date.now()}))){if(mealDraft)closeSheet();toast(`Added ${m.title||'meal'}`,()=>safe(()=>del('meals',id)))}},
   openOura:()=>openOura(),readOura:()=>readOura(),
   openFitbod:()=>openFitbod(),fbLater:()=>{try{localStorage.setItem(FBN_KEY,addDays(today(),3))}catch(e){}render()},fbImport:()=>fbImport(),
-  saveOuraManual:async()=>{const cur=S.oura[sel]||{},o={...cur},hand=new Set(cur._hand||[]);OURA_FIELDS.forEach(([k])=>{const raw=$('#o_'+k).value;let v=k==='sleepHours'?(raw===''?null:toHours(raw)):num(raw);if(v!=null)v=k==='sleepHours'?r1(v):v;if((v??null)!==(cur[k]??null))hand.add(k);if(v==null)delete o[k];else o[k]=v});o.src=o.src||'manual';if(hand.size)o._hand=[...hand];if(await safe(()=>put('oura',sel,o),'Oura numbers saved'))closeSheet()},
+  saveOuraManual:async()=>{const cur=S.oura[sel]||{},o={...cur},hand=new Set(cur._hand||[]);OURA_FIELDS.forEach(([k])=>{if(!$('#o_'+k))return;const raw=$('#o_'+k).value;let v=k==='sleepHours'?(raw===''?null:toHours(raw)):num(raw);if(v!=null)v=k==='sleepHours'?r1(v):v;if((v??null)!==(cur[k]??null))hand.add(k);if(v==null)delete o[k];else o[k]=v});o.src=o.src||'manual';if(hand.size)o._hand=[...hand];if(await safe(()=>put('oura',sel,o),'Oura numbers saved'))closeSheet()},
   delOura:async()=>{closeSheet();await deleteWith('oura',sel,`Cleared Oura numbers for ${fmtShort(sel)}`)},
   openCoach:()=>openCoach(),stopCoach:()=>{if(coachCtl)coachCtl.abort()},
   suppEdit:b=>{suppEdit=+b.dataset.i;render();const i=document.getElementById('sn'+suppEdit);if(i&&window.matchMedia('(pointer:fine)').matches)i.focus()},
@@ -2984,7 +2996,7 @@ const A={
   obSave:()=>obSave(),obDone:()=>obDone(),
   ouraConnect:()=>ouraConnect(),healthHow:()=>{healthOpen=!healthOpen;render()},copyHealth:()=>copyText($('#hUrl').value,$('#hUrl')),
   signOut:()=>signOut(),gasRetry:()=>{gasErr='';render();gasLoad()},
-  frLoad:()=>frLoad(),frInvite:()=>frInvite(null),frRelogin:b=>frInvite(b.dataset.u),frRevoke:b=>frRevoke(b.dataset.u),
+  frLoad:()=>frLoad(),frInvite:()=>frInvite(null),frRelogin:b=>frInvite(b.dataset.u),frRevoke:b=>frRevoke(b.dataset.u),frUninvite:b=>frUninvite(b.dataset.c),
   frShare:()=>frShare(),frCopy:()=>copyText(FR.codeFor?signInText(FR.code):inviteText(FR.code)),
   frShortcut:async()=>{const url=($('#frShortcut').value||'').trim();if(url&&!/^https:\/\//.test(url)){toast('Paste the full https link');return}try{await gas('shortcut',{url});toast(url?'Shortcut link saved':'Shortcut link removed');frLoad()}catch(e){toast('Couldn’t save it')}},
   chatAI:()=>chatSend('',true),
