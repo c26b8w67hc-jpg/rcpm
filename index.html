@@ -462,7 +462,7 @@ details.more.card{padding-top:6px}
 
 /* tabs: glass bar */
 .tabs{position:fixed;left:0;right:0;bottom:0;z-index:10;background:rgba(11,13,23,.72);-webkit-backdrop-filter:var(--glass);backdrop-filter:var(--glass);border-top:1px solid var(--line);padding:6px 8px env(safe-area-inset-bottom,0px)}
-.tabs-in{max-width:560px;margin:0 auto;display:grid;grid-template-columns:repeat(4,1fr);gap:4px}
+.tabs-in{max-width:560px;margin:0 auto;display:grid;grid-template-columns:repeat(5,1fr);gap:2px}
 .tabs button{position:relative;background:none;border:0;padding:8px 0 10px;display:flex;flex-direction:column;align-items:center;gap:4px;font:500 11px/1 var(--f);color:var(--faint);transition:color .25s var(--ease)}
 .tabs button svg{width:24px;height:24px;padding:2px;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;border-radius:999px;transition:background .25s var(--ease)}
 .tabs button[aria-current="page"]{color:var(--ink)}
@@ -509,8 +509,7 @@ details.more.card{padding-top:6px}
 @keyframes ringIn{from{stroke-dashoffset:var(--c)}}
 @media (prefers-reduced-motion:reduce){.ring .rv{animation:none}}
 /* in the gym */
-body.live .tabs,body.live .daynav{display:none}
-body.live{padding-bottom:calc(96px + env(safe-area-inset-bottom,0px))}
+body.live{padding-bottom:calc(160px + env(safe-area-inset-bottom,0px))}
 .lv-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin:16px 0 12px}
 .lv-head h2{font:300 28px/1.15 var(--f);letter-spacing:-.02em;margin:2px 0}
 .lv-k{margin:0;font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
@@ -534,7 +533,7 @@ body.live{padding-bottom:calc(96px + env(safe-area-inset-bottom,0px))}
 .lv-tick svg{width:20px;height:20px;fill:none;stroke:var(--muted);stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}
 .lv-row.lv-ok input{opacity:.6}.lv-row.lv-ok .lv-tick{background:var(--good);border-color:var(--good)}.lv-row.lv-ok .lv-tick svg{stroke:var(--on)}
 .lv-ex-a{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
-.lv-rest{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(12px + env(safe-area-inset-bottom,0px));width:min(528px,calc(100% - 32px));z-index:6;display:flex;align-items:center;gap:8px;padding:10px 10px 10px 18px;border-radius:999px;overflow:hidden;
+.lv-rest{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(78px + env(safe-area-inset-bottom,0px));width:min(528px,calc(100% - 32px));z-index:6;display:flex;align-items:center;gap:8px;padding:10px 10px 10px 18px;border-radius:999px;overflow:hidden;
   background:rgba(21,24,41,.92);-webkit-backdrop-filter:var(--glass);backdrop-filter:var(--glass);border:1px solid var(--line2);box-shadow:0 10px 30px rgba(0,0,0,.4)}
 .lv-rest-p{position:absolute;left:0;top:0;bottom:0;background:rgba(168,169,252,.18);transition:width .25s linear;z-index:-1}
 .lv-rest-l{font-size:13px;color:var(--muted)}
@@ -584,6 +583,7 @@ body.gate{padding-bottom:env(safe-area-inset-bottom,0px)}
 
 <nav class="tabs" aria-label="Sections"><div class="tabs-in" id="tabs">
   <button data-a="tab" data-t="today"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/></svg>Today</button>
+  <button data-a="tab" data-t="gym"><svg viewBox="0 0 24 24"><path d="M6.5 7v10M17.5 7v10M3.5 9.5v5M20.5 9.5v5M6.5 12h11"/></svg>Gym</button>
   <button data-a="tab" data-t="progress"><svg viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>Progress</button>
   <button data-a="tab" data-t="coach"><svg viewBox="0 0 24 24"><path d="M4 5h16v11H9l-5 4z"/><path d="M8 9.5h8M8 12.5h5"/></svg>Coach</button>
   <button data-a="tab" data-t="setup"><svg viewBox="0 0 24 24"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg>Setup</button>
@@ -1097,7 +1097,7 @@ function render(){
   const ae=document.activeElement;
   const keep=ae&&ae.id&&view.contains(ae)?{id:ae.id,v:ae.value,s:ae.selectionStart}:null;
   const y=window.scrollY;
-  const gate=gateView();document.body.classList.toggle('gate',!!gate);document.body.classList.toggle('live',tab==='live');
+  const gate=gateView();document.body.classList.toggle('gate',!!gate);document.body.classList.toggle('live',tab==='gym'&&!!LIVE);
   patchView(gate||((sel!==today()&&tab==='today'?`<div class="daybar" role="status"><span>Logging to <b>${fmtDay(sel)}</b></span><button class="btn small" data-a="gotoday">Back to today</button></div>`:'')+(VIEWS[tab]||VIEWS.today)()));
   if(keep){const el=document.getElementById(keep.id);if(el){el.value=keep.v;el.focus({preventScroll:true});try{el.setSelectionRange(keep.s,keep.s)}catch(e){}}}
   if(Math.abs(window.scrollY-y)>1)window.scrollTo(0,y);
@@ -1242,7 +1242,7 @@ function logCard(d){
       <ul class="list tight" id="dayMeals"${mealsOpen?'':' hidden'}>${ms.map(m=>{const x=mealTotals(m);return `<li class="item"><button class="linkbtn body" data-a="editMeal" data-id="${m.id}"><div class="t">${esc(m.title||'Meal')}</div><div class="s">${esc(m.slot)}${m.at?' · '+esc(m.at):''}</div></button><div class="r"><b>${Math.round(x.kcal)}</b> kcal<br>${Math.round(x.p)} g protein</div><button class="x-sm" data-a="delMealRow" data-id="${m.id}" aria-label="Delete ${esc(m.title||'meal')}">${XI}</button></li>`}).join('')}${bal!=null?`<li class="item"><p class="meta" style="margin:0">${bal>0?'+':''}${bal} kcal against the ${o.totalKcal} kcal the ring says you burned.</p></li>`:''}</ul>`:''}</div></div>
   <div class="lrow" id="sec-train"><div class="lmain"><h2 class="lab">Training</h2>
       ${ws.length?`<ul class="list tight">${ws.map(sessItem).join('')}</ul>`:`<p class="meta">Nothing logged ${d===today()?'yet':'this day'}.</p>`}${plannedLine(d)}</div>
-    <span class="acts col">${d===today()?(LIVE?`<button class="btn primary" data-a="lvOpen">Resume</button>`:`<button class="btn" data-a="openSuggest" data-k="session">Start</button>`):''}<button class="btn" data-a="openPicker">Add session</button></span></div>
+    <span class="acts col">${d===today()?(LIVE?`<button class="btn primary" data-a="lvOpen">Resume</button>`:`<button class="btn" data-a="tab" data-t="gym">Start</button>`):''}<button class="btn" data-a="openPicker">Add session</button></span></div>
   <div class="lrow" id="sec-stack"><div class="lmain"><h2 class="lab">Stack</h2>
       <button class="linkbtn disclose" data-a="suppToggle" aria-expanded="${suppOpen}" aria-controls="suppChips"><b class="num">${nT}</b><span> of ${nS} taken</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button></div>
     ${nT<nS?(stackConfirmed()?`<button class="btn" data-a="suppAll">Tick all</button>`:`<button class="btn" data-a="tab" data-t="setup">Set up</button>`):`<span class="done" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span>`}
@@ -2465,7 +2465,7 @@ function mealSuggestHTML(r){
     ${Array.isArray(r.steps)&&r.steps.length?`<ol class="steps">${r.steps.map(s=>`<li>${esc(s)}</li>`).join('')}</ol>`:''}
     <div class="actions"><button class="btn primary" data-a="logSuggest">Log this meal</button><button class="btn" data-a="runSuggest" data-k="meal">Another idea</button></div></div>`;
 }
-function sessionSuggestHTML(r){
+function sessionSuggestHTML(r,inTab){
   const ex=(r&&Array.isArray(r.exercises)?r.exercises:[]);
   if(!ex.length)return '<p class="note err">Claude didn’t return a session. Try again.</p>';
   return `<div class="sg"><h3 class="sg-h">${esc(r.focus||'Session')}${r.mins?` <span class="sg-m">${esc(r.mins)} min</span>`:''}</h3>${r.why?`<p class="note" style="margin-top:4px">${esc(r.why)}</p>`:''}
@@ -2473,7 +2473,7 @@ function sessionSuggestHTML(r){
     <ol class="sg-list">${ex.map(e=>{const sets=Array.isArray(e.sets)?e.sets:[];return `<li>${exPic(e.name,'ex-thumb sg-pic')}<div class="sg-ex"><b>${esc(e.name)}</b>${e.rest?`<small>rest ${esc(e.rest)}</small>`:''}</div>
       <div class="sg-sets">${sets.map(s=>`<span>${s.kg!=null&&s.kg!==''?`<b>${esc(s.kg)}</b> kg × `:''}<b>${esc(s.reps)}</b></span>`).join('')}</div>${e.note?`<small class="sg-n">${esc(e.note)}</small>`:''}</li>`}).join('')}</ol>
     ${r.finisher?`<p class="sg-w"><b>Finisher</b> ${esc(r.finisher)}</p>`:''}
-    <div class="actions"><button class="btn primary" data-a="lvStartSug">Start session</button><button class="btn" data-a="runSuggest" data-k="session">Another option</button><button class="btn ghost" data-a="logSuggest">Log it afterwards</button></div></div>`;
+    <div class="actions"><button class="btn primary" data-a="lvStartSug">Start session</button><button class="btn" data-a="${inTab?'gymNext':'runSuggest'}" data-k="session">Another option</button><button class="btn ghost" data-a="logSuggest">Log it afterwards</button></div></div>`;
 }
 function logSuggest(){
   if(!lastSuggest)return;const {kind,r}=lastSuggest;
@@ -2701,8 +2701,10 @@ function exAlternatives(name,st=S.settings){const e=EX_BY[String(name).toLowerCa
 const SET_ADJ={new:-1,lt1:0,y13:0,y3:1};
 function programDay(skip=0){const st=S.settings,t=today(),p=program(st),since=st.programStart||addDays(t,-28);
   const planned=gymPlanFor(t)[0],pi=planned?p.days.indexOf(planned.focus):-1;
-  const done=new Set(Object.values(S.workouts).filter(w=>w.kind==='gym'&&w.date>=since&&w.date<t).map(w=>w.date)).size;
-  const i=((pi>=0?pi:done)+skip)%p.days.length;return {p,i,name:p.days[i],planned:pi>=0&&skip===0}}
+  // the day after the last program day you did (whatever its name), else count the gym days since the program started
+  const gyms=Object.values(S.workouts).filter(w=>w.kind==='gym'&&w.date>=since&&w.date<=t).sort((a,b)=>a.date.localeCompare(b.date)||(a.t||0)-(b.t||0));
+  const last=[...gyms].reverse().find(w=>p.days.includes(w.focus)),done=new Set(gyms.filter(w=>w.date<t).map(w=>w.date)).size;
+  const i=((pi>=0?pi:last?p.days.indexOf(last.focus)+1:done)+skip)%p.days.length;return {p,i,name:p.days[i],planned:pi>=0&&skip===0}}
 function programSession(skip=0){
   const st=S.settings,rec=recoveryState(),low=!!(rec&&rec.low),{p,i,name,planned}=programDay(skip);
   const plan=Object.fromEntries(liftPlan().map(l=>[l.name.toLowerCase(),l])),used=new Set(),adj=SET_ADJ[st.experience]||0;
@@ -2719,7 +2721,7 @@ function programCard(){const st=S.settings;if(!st.experience)return '';const p=p
     <p class="note" style="margin:0 0 6px">${esc(p.name)}. Weights go up when you hit the top of the rep range on every set (double progression).</p>
     <ul class="list">${p.days.map((d,k)=>{const used=new Set(),names=DAYS[d].map(([pat,,,,pick])=>{const o=exOptions(pat,st).filter(e=>!used.has(e.name));const e=o[Math.min(pick||0,o.length-1)];if(e)used.add(e.name);return e?e.name:''}).filter(Boolean);
       return `<li class="item"><div class="body"><div class="t">${k===i?'<span class="badge" style="background:var(--good)">Next</span>':''}${esc(d)}</div><div class="s">${esc(names.join(' · '))}</div></div></li>`}).join('')}</ul>
-    <div class="actions"><button class="btn small" data-a="openSuggest" data-k="session">Today’s session</button></div></section>`}
+    ${tab==='gym'?'':'<div class="actions"><button class="btn small" data-a="tab" data-t="gym">Open the Gym tab</button></div>'}</section>`}
 
 /* ---------- built-in coach answers: intent rules with the user's own numbers (no AI) ---------- */
 function qaNums(){const st=S.settings,t=today(),y=addDays(t,-1),rng=(e,n)=>[...Array(n)].map((_,i)=>addDays(e,-i));
@@ -2748,7 +2750,7 @@ const QA=[
  {k:'whey',re:/whey|protein (powder|shake)|shake/,a:n=>`Whey is just convenient protein: about 25 g per scoop. Use it when food doesn’t get you to ${n.st.protein} g, typically after training or as a snack. Any time of day works; total daily protein matters far more than timing.`},
  {k:'deload',re:/deload|overtrain|burn(ed|t)? out|need a break|take a week off/,a:n=>`Deload when lifts stall across the board, joints ache, or motivation and sleep drop for over a week, or simply every 6–8 weeks. A deload week: same exercises, half the sets, weights about 10% lighter. ${n.hrv?`Your HRV is ${n.hrv.pct>0?'+':''}${n.hrv.pct}% against your normal${n.hrv.low?', which supports taking it easy now':''}.`:''}`},
  {k:'injury',re:/injur|pain|hurt|strain|sprain|tweak|pulled|tendon|tendin|sharp|numb|swollen|pop(ped)?\b/,a:()=>`I can’t assess an injury, so please **see a physio or doctor**, especially for sharp pain, swelling, numbness or pain that stays at rest. Until then: train around it, never through it. Swap the exercises that hurt (Setup › your profile can mark back, knee or shoulder issues so the program avoids them), and keep everything pain-free.`},
- {k:'program',re:/program|split|routine|plan (for|this) week|what (should i|do i) (train|do) today|today'?s (session|workout)|next (session|workout)/,a:n=>{if(!n.st.experience)return `Tap Suggest on the training card for today’s session: it picks the focus most due from your own split and sets each lift’s weight.`;const s=programSession(0);return `You’re on **${program().name}**. Next up: **${s.focus}** — ${s.exercises.map(e=>e.name).join(', ')}. Tap Suggest on the training card for sets and weights.`}},
+ {k:'program',re:/program|split|routine|plan (for|this) week|what (should i|do i) (train|do) today|today'?s (session|workout)|next (session|workout)/,a:n=>{if(!n.st.experience)return `Open the Gym tab for today’s session: it picks the focus most due from your own split and sets each lift’s weight.`;const s=programSession(0);return `You’re on **${program().name}**. Next up: **${s.focus}** — ${s.exercises.map(e=>e.name).join(', ')}. Open the Gym tab for sets and weights, and Start session when you’re there.`}},
  {k:'today',re:/should i (train|lift|go to the gym|work ?out)|train today|ready to train|readiness|hrv|recovered/,a:n=>{const o=n.o;return `${o&&o.readiness!=null?`Readiness ${o.readiness}${o.sleepHours?`, ${r1(o.sleepHours)} h sleep`:''}. `:''}${n.hrv?`HRV ${n.hrv.now} against your normal ${n.hrv.base} (${n.hrv.pct>0?'+':''}${n.hrv.pct}%). `:''}${n.hrv&&n.hrv.low||o&&num(o.readiness)!=null&&o.readiness<70?'Train, but keep it easy: same weights, one set fewer, or swap for a walk.':'Good to train as planned.'}${!o&&!n.hrv?' Without ring data: if you slept 7 h+ and nothing hurts, train as planned.':''}`}},
  {k:'rest',re:/rest day|days off|how many days|recover between|every day|train daily/,a:n=>`Muscles need about 48 h before training them hard again. ${n.st.experience?`Your ${program().name.toLowerCase()} spaces that out for you. `:''}Take at least 1–2 full rest days a week; walking on them helps. Your target is ${n.st.weekly} sessions a week, and you did ${n.sess} in the last 7 days.`},
  {k:'pre',re:/before (my |the )?(workout|training|gym|lifting)|pre.?(workout|training) (meal|food|snack|eat)/,a:()=>`1–3 h before training: a normal meal with protein and carbs (chicken and rice, eggs on toast, yogurt with oats and fruit). Under an hour before: something small and easy, like a banana or a yogurt. Coffee 30–60 min before helps if you drink it.`},
@@ -2796,9 +2798,20 @@ function qaAnswer(q){const lo=' '+String(q||'').toLowerCase()+' ';
 
 /* ---------- in the gym: today's session as a checklist, a rest timer, saved on Finish (replaces the Fitbod round trip) ---------- */
 // photos: free-exercise-db (public domain), shipped with the installable app in ex/<slug>-0.jpg (start) and -1.jpg (end)
-const EX_PIC=new Set('ab-wheel-rollout arnold-press assisted-pull-up back-extension back-squat barbell-bench-press barbell-curl barbell-hip-thrust barbell-row bench-dip bodyweight-squat bulgarian-split-squat cable-crunch cable-curl cable-fly cable-kickback cable-lateral-raise cable-pull-through chest-dip chest-supported-dumbbell-row chin-up close-grip-bench-press close-grip-lat-pulldown concentration-curl crunch dead-bug deadlift decline-push-up diamond-push-up dumbbell-bench-press dumbbell-calf-raise dumbbell-curl dumbbell-fly dumbbell-hip-thrust dumbbell-kickback dumbbell-lateral-raise dumbbell-overhead-tricep-extension dumbbell-pullover dumbbell-rear-delt-fly dumbbell-romanian-deadlift dumbbell-row dumbbell-squat dumbbell-step-up ez-bar-curl face-pull farmer-s-carry floor-press front-squat glute-bridge goblet-squat good-morning hack-squat half-kneeling-dumbbell-press hammer-curl hanging-leg-raise heel-elevated-goblet-squat hip-abduction-machine incline-barbell-bench-press incline-dumbbell-bench-press incline-dumbbell-curl incline-push-up inverted-row kettlebell-swing lat-pulldown lateral-lunge lean-away-lateral-raise leg-extension leg-press leg-press-calf-raise low-to-high-cable-fly lying-leg-curl machine-chest-press machine-lateral-raise machine-row machine-shoulder-press nordic-curl overhead-cable-tricep-extension overhead-press pallof-press pec-deck plank preacher-curl pull-up push-up reverse-crunch reverse-lunge reverse-pec-deck romanian-deadlift seated-cable-row seated-calf-raise seated-dumbbell-shoulder-press seated-leg-curl side-plank single-leg-calf-raise single-leg-glute-bridge single-leg-romanian-deadlift sissy-squat skull-crusher slider-leg-curl smith-machine-bench-press smith-machine-incline-bench-press smith-machine-split-squat smith-machine-squat split-squat standing-calf-raise straight-arm-pulldown t-bar-row tempo-squat trap-bar-deadlift tricep-pushdown upright-row walking-lunge'.trim().split(' '));
+const EX_PIC=new Set('ab-wheel-rollout arnold-press assisted-pull-up back-extension back-squat barbell-bench-press barbell-curl barbell-hip-thrust barbell-row belt-squat bench-dip bird-dog bodyweight-squat bulgarian-split-squat cable-crunch cable-curl cable-fly cable-kickback cable-lateral-raise cable-pull-through chest-dip chest-supported-dumbbell-row chin-up close-grip-bench-press close-grip-lat-pulldown concentration-curl crunch dead-bug deadlift decline-push-up diamond-push-up doorframe-row dumbbell-bench-press dumbbell-calf-raise dumbbell-curl dumbbell-fly dumbbell-hip-thrust dumbbell-kickback dumbbell-lateral-raise dumbbell-leg-curl dumbbell-overhead-tricep-extension dumbbell-pullover dumbbell-rear-delt-fly dumbbell-romanian-deadlift dumbbell-row dumbbell-squat dumbbell-step-up ez-bar-curl face-pull farmer-s-carry floor-press front-squat glute-bridge goblet-squat good-morning hack-squat half-kneeling-dumbbell-press hammer-curl hanging-leg-raise heel-elevated-goblet-squat hip-abduction-machine hip-hinge-hold hollow-hold incline-barbell-bench-press incline-dumbbell-bench-press incline-dumbbell-curl incline-push-up inverted-row kettlebell-swing landmine-press lat-pulldown lateral-lunge lean-away-lateral-raise leg-extension leg-press leg-press-calf-raise low-to-high-cable-fly lying-leg-curl machine-chest-press machine-lateral-raise machine-row machine-shoulder-press nordic-curl overhead-cable-tricep-extension overhead-press pallof-press pec-deck pike-push-up plank preacher-curl prone-y-raise pull-up push-up reverse-crunch reverse-lunge reverse-pec-deck romanian-deadlift seated-cable-row seated-calf-raise seated-dumbbell-shoulder-press seated-leg-curl side-plank single-leg-calf-raise single-leg-glute-bridge single-leg-romanian-deadlift sissy-squat skull-crusher slider-leg-curl smith-machine-bench-press smith-machine-incline-bench-press smith-machine-split-squat smith-machine-squat split-squat standing-calf-raise straight-arm-pulldown suitcase-carry t-bar-row tempo-squat trap-bar-deadlift tricep-pushdown upright-row walking-lunge wall-sit x-ab-crunch-machine x-air-bike x-barbell-shoulder-press x-barbell-shrug x-bent-over-two-dumbbell-row x-bicycling-stationary x-cable-one-arm-tricep-extension x-cross-body-hammer-curl x-decline-barbell-bench-press x-decline-crunch x-drag-curl x-dumbbell-shrug x-dumbbell-side-bend x-exercise-ball-crunch x-flat-bench-lying-leg-raise x-front-dumbbell-raise x-glute-kickback x-jogging-treadmill x-knee-hip-raise-on-parallel-bars x-leverage-high-row x-leverage-incline-chest-press x-lying-dumbbell-tricep-extension x-machine-bicep-curl x-one-arm-lat-pulldown x-palms-up-dumbbell-wrist-curl-over-a-bench x-push-press x-reverse-barbell-curl x-rowing-stationary x-russian-twist x-scissor-kick x-seated-dumbbell-curl x-smith-machine-bent-over-row x-smith-machine-calf-raise x-stairmaster x-standing-dumbbell-press x-superman x-thigh-adductor x-triceps-pushdown-rope-attachment x-walking-treadmill'.split(' '));
+// other names for the same movements (Fitbod's and common gym names) → a photo
+const EX_ALIAS={"hammer curls":"hammer-curl","dip":"chest-dip","dips":"chest-dip","cable rope tricep extension":"x-triceps-pushdown-rope-attachment","dumbbell incline bench press":"incline-dumbbell-bench-press","dumbbell bicep curl":"dumbbell-curl","dumbbell front raise":"x-front-dumbbell-raise","machine fly":"pec-deck","seated dumbbell curl":"x-seated-dumbbell-curl","cable face pull":"face-pull","dumbbell shoulder press":"seated-dumbbell-shoulder-press","barbell shoulder press":"x-barbell-shoulder-press","bent over barbell row":"barbell-row","cable one arm underhand tricep extension":"x-cable-one-arm-tricep-extension","crunches":"crunch","cable row":"seated-cable-row","barbell incline bench press":"incline-barbell-bench-press","hammerstrength chest press":"machine-chest-press","vertical leg raise":"x-knee-hip-raise-on-parallel-bars","vertical knee raise":"x-knee-hip-raise-on-parallel-bars","lying hamstrings curl":"lying-leg-curl","seated machine calf press":"seated-calf-raise","ab rollout":"ab-wheel-rollout","cable crossover fly":"cable-fly","hammerstrength iso row":"machine-row","leg raise":"x-flat-bench-lying-leg-raise","dumbbell side bend":"x-dumbbell-side-bend","dumbbell rear delt raise":"dumbbell-rear-delt-fly","dumbbell tricep extension":"dumbbell-overhead-tricep-extension","machine leg press":"leg-press","scissor crossover kick":"x-scissor-kick","dumbbell shrug":"x-dumbbell-shrug","dumbbell skullcrusher":"x-lying-dumbbell-tricep-extension","smith machine bent over row":"x-smith-machine-bent-over-row","machine hip abductor":"hip-abduction-machine","back extensions":"back-extension","single arm lat pulldown":"x-one-arm-lat-pulldown","machine rear delt fly":"reverse-pec-deck","cross body hammer curls":"x-cross-body-hammer-curl","low cable chest fly":"low-to-high-cable-fly","wide grip lat pulldown":"lat-pulldown","hammerstrength decline chest press":"x-decline-barbell-bench-press","cable tricep pushdown":"tricep-pushdown","hammerstrength high row":"x-leverage-high-row","reverse dumbbell curl":"x-reverse-barbell-curl","dumbbell lunge":"walking-lunge","barbell decline bench press":"x-decline-barbell-bench-press","russian twist":"x-russian-twist","hanging knee raise":"hanging-leg-raise","machine hip adductor":"x-thigh-adductor","hammerstrength incline chest press":"x-leverage-incline-chest-press","skullcrusher":"skull-crusher","machine bicep curl":"x-machine-bicep-curl","standing dumbbell calf raise":"dumbbell-calf-raise","exercise ball crunch":"x-exercise-ball-crunch","ab crunch machine":"x-ab-crunch-machine","calf press":"leg-press-calf-raise","incline ez-bar curl":"ez-bar-curl","cable bicep curl":"cable-curl","glute kickback machine":"x-glute-kickback","standing dumbbell shoulder press":"x-standing-dumbbell-press","dumbbell bent over row":"x-bent-over-two-dumbbell-row","bicycle crunch":"x-air-bike","barbell bicep drag curl":"x-drag-curl","dumbbell back fly":"dumbbell-rear-delt-fly","reverse barbell curl":"x-reverse-barbell-curl","machine bench press":"machine-chest-press","decline crunch":"x-decline-crunch","ez-bar curl":"ez-bar-curl","push press":"x-push-press","superman":"x-superman","hip thrust":"barbell-hip-thrust","side bridge":"side-plank","dumbbell bent over reverse fly":"dumbbell-rear-delt-fly","smith machine calf raise":"x-smith-machine-calf-raise","palms-up dumbbell wrist curl":"x-palms-up-dumbbell-wrist-curl-over-a-bench","barbell shrug":"x-barbell-shrug","cable hip extension":"cable-kickback","rowing":"x-rowing-stationary","stair stepper":"x-stairmaster","walking - treadmill":"x-walking-treadmill","walking":"x-walking-treadmill","running - treadmill":"x-jogging-treadmill","running":"x-jogging-treadmill","cycling - stationary":"x-bicycling-stationary","pullups":"pull-up","pull-up":"pull-up","chin-up":"chin-up","pushups":"push-up","push-up":"push-up","leg extensions":"leg-extension","lying leg curls":"lying-leg-curl","triceps pushdown":"tricep-pushdown","lat pull down":"lat-pulldown","bench press":"barbell-bench-press","squat":"back-squat","barbell squat":"back-squat","barbell deadlift":"deadlift","shoulder press":"seated-dumbbell-shoulder-press","military press":"overhead-press","lateral raise":"dumbbell-lateral-raise","bicep curl":"dumbbell-curl","cycling":"x-bicycling-stationary","elliptical":"x-stairmaster","leg pull-in":"reverse-crunch","balance trainer russian twist":"x-russian-twist","scissor kick":"x-scissor-kick","tricep push up":"diamond-push-up","machine tricep dip":"chest-dip","gorilla rows":"x-bent-over-two-dumbbell-row","oblique crunch":"crunch","pause barbell decline bench press":"x-decline-barbell-bench-press","trx row":"inverted-row","cable rope overhead triceps extension":"overhead-cable-tricep-extension","v-bar pulldown":"close-grip-lat-pulldown","kettlebell sit up and press":"crunch","front plate raise":"x-front-dumbbell-raise","hand release push up":"push-up","cobra triceps extension":"diamond-push-up","downward dog push up":"pike-push-up","superman hold":"x-superman","single leg hip thrust":"single-leg-glute-bridge","air squats":"bodyweight-squat","shotgun row":"dumbbell-row","incline dumbbell row":"chest-supported-dumbbell-row","tuck crunch":"crunch","cable one arm tricep side extension":"x-cable-one-arm-tricep-extension","reverse grip pull down":"lat-pulldown","incline smith press":"smith-machine-incline-bench-press"};
 const exSlug=n=>String(n).toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
-function exPic(name,cls='ex-pic'){if(hasClaude())return '';const s=exSlug(name);if(!EX_PIC.has(s))return '';
+// exact name, then a known other name, then the name without equipment words ("Hammerstrength Chest Press" → "chest press")
+const exNorm=n=>String(n).toLowerCase().replace(/\b(hammer ?strength|leverage|machines?|cables?|dumbbells?|barbells?|smith|seated|standing|single[- ]arm|one[- ]arm|ez[- ]?bar|kettlebells?|lying|weighted|assisted|band|wide[- ]grip)\b/g,' ').replace(/[^a-z ]/g,' ').replace(/(\w{3,})s\b/g,'$1').replace(/\s+/g,' ').trim();
+let _exN=null;
+function picSlug(name){const lo=String(name||'').toLowerCase().trim(),s=exSlug(lo);if(EX_PIC.has(s))return s;const a=EX_ALIAS[lo];if(a&&EX_PIC.has(a))return a;
+  if(!_exN){_exN={};EXERCISES.forEach(e=>{const k=exNorm(e.name),v=exSlug(e.name);if(k&&EX_PIC.has(v)&&!_exN[k])_exN[k]=v});Object.entries(EX_ALIAS).forEach(([k,v])=>{const n=exNorm(k);if(n&&EX_PIC.has(v)&&!_exN[n])_exN[n]=v})}
+  const n=exNorm(lo);if(_exN[n])return _exN[n];
+  // last resort: the longest known name whose words all appear in this one ("pause back squat" → back squat)
+  const w=new Set(n.split(' '));let best=null;for(const k in _exN){const kw=k.split(' ');if(kw.length>1&&kw.every(x=>w.has(x))&&(!best||k.length>best.length))best=k}
+  return best?_exN[best]:null}
+function exPic(name,cls='ex-pic'){if(hasClaude())return '';const s=picSlug(name);if(!s)return '';
   return `<span class="${cls}" aria-hidden="true"><img src="ex/${s}-0.jpg" alt="" loading="lazy"><img src="ex/${s}-1.jpg" alt="" loading="lazy"></span>`}
 const LVKEY='rcmp.live';let LIVE=null;try{LIVE=JSON.parse(localStorage.getItem(LVKEY)||'null')}catch(e){}
 const lvSave=()=>{try{if(LIVE)localStorage.setItem(LVKEY,JSON.stringify(LIVE));else localStorage.removeItem(LVKEY)}catch(e){}};
@@ -2811,13 +2824,13 @@ function lvStart(r){
     ex:(r?r.exercises:[]).map(e=>({name:e.name,rest:restSecs(e.rest),note:e.note||'',sets:(e.sets||[]).map(s=>({kg:s.kg??'',reps:s.reps??'',done:false}))}))};
   LIVE.ex.forEach(e=>{if(!e.sets.length){const l=plan[e.name.toLowerCase()];e.sets=[0,1,2].map(()=>({kg:l?l.next.w:'',reps:l?l.next.r:'',done:false}))}});
   lvSave();closeSheet();lvOpen()}
-function lvOpen(){tab='live';window.scrollTo(0,0);render();lvTicker()}
+function lvOpen(){tab='gym';window.scrollTo(0,0);render();lvTicker()}
 let lvTimer=null,lvAudio=null,lvBeeped=false;
 function lvTicker(){clearInterval(lvTimer);lvTimer=setInterval(()=>{if(!LIVE){clearInterval(lvTimer);return}
   const c=$('#lvClock');if(c)c.textContent=mmss((Date.now()-LIVE.started)/1000);
   const left=LIVE.restEnd?(LIVE.restEnd-Date.now())/1000:null,bar=$('#lvRest');
   if(left!=null&&left<=0&&!lvBeeped){lvBeeped=true;lvBeep();}
-  if(left!=null&&left<-4){LIVE.restEnd=null;lvSave();if(tab==='live')render();return}
+  if(left!=null&&left<-4){LIVE.restEnd=null;lvSave();if(tab==='gym')render();return}
   if(bar&&left!=null){const t=bar.querySelector('.lv-rest-t');if(t)t.textContent=left>0?mmss(left):'Go';bar.classList.toggle('lv-go',left<=0);
     const p=bar.querySelector('.lv-rest-p');if(p)p.style.width=Math.max(0,Math.min(100,left/LIVE.restFor*100))+'%'}},250)}
 function lvBeep(){try{navigator.vibrate&&navigator.vibrate([200,100,200])}catch(e){}
@@ -2833,12 +2846,18 @@ function lvTick(i,j){lvUnlock();const e=LIVE.ex[i],s=e&&e.sets[j];if(!s)return;
   lvSave();render()}
 function lvRestAdj(d){if(!LIVE||!LIVE.restEnd)return;LIVE.restEnd+=d*1000;LIVE.restFor=Math.max(15,LIVE.restFor+d);lvBeeped=false;lvSave();render()}
 let lvFinishAsk=false,lvDiscardAsk=false;
-VIEWS.live=function(){
-  if(!LIVE)return `<section class="gate-v"><p class="empty">No session running.</p><button class="btn" data-a="tab" data-t="today">Back to Today</button></section>`;
+// the Gym tab: today's session to start, or the running one
+let gymSkip=0;
+VIEWS.gym=function(){
+  if(!LIVE){const t=today(),done=workoutsOn(t).filter(w=>w.kind==='gym'),r=ruleSession(gymSkip);if(r)lastSuggest={kind:'session',r};
+    return `<section class="lv-head"><div><p class="lv-k">${done.length?'Done today: '+done.map(w=>esc(w.focus||'Gym')+(w.mins?' · '+w.mins+' min':'')).join(', '):'Today'}</p><h2>${done.length?'Another <em>session</em>?':'Ready to <em>train</em>'}</h2></div></section>
+      ${r?`<section class="card">${sessionSuggestHTML(r,true)}</section>`:`<section class="card"><p class="empty">Log or import a few gym sessions and RCMP builds today’s session from your own lifts.</p></section>`}
+      <section class="card"><div class="card-h"><h2>Your own plan</h2></div><p class="note" style="margin:0 0 10px">Start blank and add exercises as you go.</p><button class="btn" data-a="lvStartEmpty">Start an empty session</button></section>
+      ${programCard()}`}
   const nDone=LIVE.ex.reduce((a,e)=>a+e.sets.filter(s=>s.done).length,0),nAll=LIVE.ex.reduce((a,e)=>a+e.sets.length,0);
   const left=LIVE.restEnd?(LIVE.restEnd-Date.now())/1000:null;
   return `<section class="lv-head"><div><p class="lv-k">In the gym · <span id="lvClock">${mmss((Date.now()-LIVE.started)/1000)}</span></p><h2>${esc(LIVE.focus||'Session')}</h2><p class="lv-k">${nDone} of ${nAll} sets done</p></div>
-    <div class="lv-acts"><button class="btn primary" data-a="lvFinish">${lvFinishAsk?'Tap again to save':'Finish'}</button><button class="btn small ghost" data-a="tab" data-t="today">Minimise</button></div></section>
+    <div class="lv-acts"><button class="btn primary" data-a="lvFinish">${lvFinishAsk?'Tap again to save':'Finish'}</button></div></section>
   ${LIVE.ex.map((e,i)=>{const x=EX_BY[e.name.toLowerCase()],done=e.sets.length&&e.sets.every(s=>s.done);
     return `<section class="card lv-ex${done?' is-done':''}"><div class="lv-top">${exPic(e.name)}<div class="lv-name"><h3>${esc(e.name)}</h3><small>${x?esc(x.mus)+' · ':''}rest ${mmss(e.rest||90)}</small></div></div>
       ${x||e.note?`<details class="lv-cue"><summary>How to</summary><p>${esc(x?x.cue:'')}${e.note&&!(x&&e.note.includes(x.cue))?' '+esc(e.note.split(' · ')[0]):''}</p></details>`:''}
@@ -2869,14 +2888,14 @@ async function lvFinish(){
     return {name:e.name,sets:d.length,reps:r.reduce((a,b)=>a+b,0),best:Math.max(...r),top:top||null,e1rm:e1,vol:top>0?Math.round(d.reduce((a,s,k)=>a+w[k]*r[k],0)):null,
       detail:top>0?d.map((s,k)=>`${w[k]}×${r[k]}`).join(', '):r.join(', ')}}).filter(Boolean);
   if(!ex.length){toast('Tick at least one set before finishing, or discard the session.');lvFinishAsk=false;render();return}
-  if(!lvFinishAsk){lvFinishAsk=true;render();setTimeout(()=>{lvFinishAsk=false;if(tab==='live')render()},4000);return}
+  if(!lvFinishAsk){lvFinishAsk=true;render();setTimeout(()=>{lvFinishAsk=false;if(tab==='gym')render()},4000);return}
   lvFinishAsk=false;
   const idx=exerciseIndex(),prs=ex.filter(x=>{const h=idx[x.name.toLowerCase()];const prev=h?h.rows.map(r=>r.e1rm).filter(v=>v!=null):[];return x.e1rm&&prev.length&&x.e1rm>Math.max(...prev)}).map(x=>x.name);
   const o={date:LIVE.date,kind:'gym',focus:LIVE.focus,mins:Math.max(1,Math.round((Date.now()-LIVE.started)/6e4)),source:'manual',live:true,t:LIVE.started,exercises:ex};
   if(!await safe(()=>put('workouts',newId(),o)))return;
-  LIVE=null;lvSave();clearInterval(lvTimer);tab='today';sel=today();window.scrollTo(0,0);render();
+  LIVE=null;lvSave();clearInterval(lvTimer);gymSkip=0;sel=today();window.scrollTo(0,0);render();
   toast(`Session saved: ${ex.length} exercise${ex.length>1?'s':''}, ${ex.reduce((a,x)=>a+x.sets,0)} sets.${prs.length?' New best on '+prs.join(', ')+'!':''}`)}
-function lvBanner(){if(!LIVE||tab==='live')return '';const n=LIVE.ex.reduce((a,e)=>a+e.sets.filter(s=>s.done).length,0);
+function lvBanner(){if(!LIVE||tab==='gym')return '';const n=LIVE.ex.reduce((a,e)=>a+e.sets.filter(s=>s.done).length,0);
   return `<section class="nudge lv-banner"><div class="nudge-t"><b>${esc(LIVE.focus||'Session')} in progress</b><small>${n} sets done · started ${new Date(LIVE.started).toTimeString().slice(0,5)}</small></div><div class="nudge-a"><button class="btn small primary" data-a="lvOpen">Back to it</button></div></section>`}
 
 /* ---------- friends: joining with an invite code, the onboarding wizard, connections, the owner's panel ---------- */
@@ -3120,14 +3139,14 @@ const A={
   frLoad:()=>frLoad(),frInvite:()=>frInvite(null),frRelogin:b=>frInvite(b.dataset.u),frRevoke:b=>frRevoke(b.dataset.u),frUninvite:b=>frUninvite(b.dataset.c),
   frShare:()=>frShare(),frCopy:()=>copyText(FR.codeFor?signInText(FR.code):inviteText(FR.code)),
   frShortcut:async()=>{const url=($('#frShortcut').value||'').trim();if(url&&!/^https:\/\//.test(url)){toast('Paste the full https link');return}try{await gas('shortcut',{url});toast(url?'Shortcut link saved':'Shortcut link removed');frLoad()}catch(e){toast('Couldn’t save it')}},
-  chatAI:()=>chatSend('',true),
+  chatAI:()=>chatSend('',true),gymNext:()=>{gymSkip++;render();window.scrollTo(0,0)},
   lvStartSug:()=>lvStart(lastSuggest&&lastSuggest.r),lvStartEmpty:()=>lvStart(null),lvOpen:()=>lvOpen(),
   lvTick:b=>lvTick(+b.dataset.i,+b.dataset.j),
   lvAddSet:b=>{const e=LIVE.ex[+b.dataset.i],l=e.sets[e.sets.length-1];e.sets.push({kg:l?l.kg:'',reps:l?l.reps:'',done:false});lvSave();render()},
   lvRm:b=>{const i=+b.dataset.i,x=LIVE.ex[i];LIVE.ex.splice(i,1);lvSave();render();toast(x.name+' removed',()=>{LIVE.ex.splice(i,0,x);lvSave();render()})},
   lvSwap:b=>lvPicker('swap',+b.dataset.i),lvAdd:()=>lvPicker('add'),lvPick:b=>lvPick(b.dataset.n,b.dataset.m,b.dataset.i===''?null:+b.dataset.i),
   lvFinish:()=>lvFinish(),
-  lvDiscard:()=>{if(!lvDiscardAsk){lvDiscardAsk=true;render();setTimeout(()=>{lvDiscardAsk=false;if(tab==='live')render()},4000);return}lvDiscardAsk=false;LIVE=null;lvSave();clearInterval(lvTimer);tab='today';render();toast('Session discarded')},
+  lvDiscard:()=>{if(!lvDiscardAsk){lvDiscardAsk=true;render();setTimeout(()=>{lvDiscardAsk=false;if(tab==='gym')render()},4000);return}lvDiscardAsk=false;LIVE=null;lvSave();clearInterval(lvTimer);render();toast('Session discarded')},
   lvRestAdj:b=>lvRestAdj(+b.dataset.d),lvRestSkip:()=>{if(LIVE){LIVE.restEnd=null;lvSave();render()}},
   setInj:b=>{const a=new Set(setDraft.injuries||[]),k=b.dataset.k;if(a.has(k))a.delete(k);else a.add(k);setDraft.injuries=[...a];render()},
   recalcT:()=>{const d=setDraft,lw=latestWeight();if(!d.sex||!num(d.age)||!num(d.heightCm)||!lw){toast('Fill in sex, age and height, and log a weight first.');return}
@@ -3204,7 +3223,7 @@ setInterval(()=>{const t=today();if(t!==render._day){if(render._day&&sel===rende
 let autoSynced=false;
 function maybeAutoSync(){if(autoSynced||mode!=='db'&&mode!=='local')return; /* the installable app gets the sheet with its boot request */if(!S.settings.ouraSheetId)return;autoSynced=true;const l=lastOuraSync();if(!l||Date.now()-l.at>36e5)syncOuraSheet(false)}
 const _render=render;render=function(){_render();if(mode!=='loading'){setTimeout(maybeAutoSync,0);setTimeout(maybeDaily,50)}};
-render();initStore();initAI();initAssets();
+render();initStore();initAI();initAssets();if(LIVE)lvTicker();
 </script>
 <script>if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});</script>
 </body>
