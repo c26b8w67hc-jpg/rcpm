@@ -10,29 +10,34 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
 <style>
-:root{--bg:#0B0D17;--card:rgba(255,255,255,.055);--raise:rgba(255,255,255,.1);--ink:#F4F1EA;--muted:rgba(244,241,234,.66);--line:rgba(255,255,255,.08);--line2:rgba(255,255,255,.16);
+:root{--bg:#0B0D17;--card:rgba(255,255,255,.055);--raise:rgba(255,255,255,.1);--ink:#F4F1EA;--muted:#A9A7B4;--line:rgba(255,255,255,.08);--line2:rgba(255,255,255,.16);
   --good:#7FD8BE;--warn:#FFB648;--hot:#A8A9FC;--on:#0B0D17;--r:20px;color-scheme:dark}
 *{box-sizing:border-box}
+::selection{background:var(--hot);color:var(--on)}
+:focus-visible{outline:2px solid var(--hot);outline-offset:2px;border-radius:8px}
+a{text-underline-offset:3px}
 html{background:var(--bg);-webkit-text-size-adjust:100%;scroll-padding-top:16px}
 body{margin:0;background:radial-gradient(120% 50% at 50% 0%,#1A1E3D 0%,var(--bg) 60%) fixed,var(--bg);color:var(--ink);font:16px/1.6 Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}
 main{max-width:640px;margin:0 auto;padding:max(28px,env(safe-area-inset-top)) 16px 64px}
 h1{font:300 36px/1.12 Inter,sans-serif;letter-spacing:-.02em;margin:18px 0 10px}
 h1 em,h2 em{font-family:"Instrument Serif",Georgia,serif;font-style:italic;font-weight:400}
-h2{font:400 26px/1.2 Inter,sans-serif;letter-spacing:-.01em;margin:0 0 6px}
+h2{font:400 26px/1.2 Inter,sans-serif;letter-spacing:-.01em;margin:0 0 4px}
 h3{font:600 16px/1.35 Inter,sans-serif;margin:22px 0 6px}
 p{margin:8px 0}
 .lead{color:var(--muted);font-size:17px}
 .brand{display:flex;align-items:center;gap:10px;font:600 14px/1 Inter,sans-serif;letter-spacing:.22em}
 .brand img{width:28px;height:28px;border-radius:50%}
 section{margin:18px 0;padding:22px 20px;border-radius:var(--r);background:var(--card);border:1px solid var(--line)}
-.kick{font:500 12px/1.2 Inter,sans-serif;letter-spacing:.08em;text-transform:uppercase;color:var(--good);margin:0 0 8px}
+.sub{margin:0 0 12px;color:var(--good);font-size:15px}
+.bar{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.bar .brand{color:var(--ink);text-decoration:none;min-height:44px}
+.bar .open{display:inline-flex;align-items:center;min-height:44px;padding:0 16px;border-radius:999px;background:var(--raise);color:var(--ink);font-size:14px;font-weight:500;text-decoration:none}
+.bar .open:hover{background:rgba(255,255,255,.16)}
 ol,ul{padding-left:22px;margin:8px 0}
 li{margin:6px 0}
 li::marker{color:var(--muted)}
 b{font-weight:600}
 .muted{color:var(--muted)}
-.tag{display:inline-block;font:500 12px/1 Inter,sans-serif;padding:5px 9px;border-radius:999px;background:var(--raise);color:var(--ink);vertical-align:2px;margin-left:4px}
-.tag.must{background:var(--good);color:var(--on)}
 .note{margin:14px 0 0;padding:12px 14px;border-radius:14px;background:rgba(255,182,72,.1);border:1px solid rgba(255,182,72,.28);font-size:15px}
 .ok{margin:14px 0 0;padding:12px 14px;border-radius:14px;background:rgba(127,216,190,.1);border:1px solid rgba(127,216,190,.3);font-size:15px}
 nav ol{columns:2;column-gap:18px;font-size:15px;padding-left:20px}
@@ -50,7 +55,7 @@ footer{color:var(--muted);font-size:14px;text-align:center;margin-top:28px}
 </head>
 <body>
 <main>
-<div class="brand"><img src="icon-192.png" alt="">RCMP</div>
+<header class="bar"><a class="brand" href="./" aria-label="Open RCMP"><img src="icon-192.png" alt="">RCMP</a><a class="open" href="./">Open the app</a></header>
 <h1>Set up RCMP <em>in 5 minutes</em></h1>
 <p class="lead">RCMP tracks your weight, food, training and recovery in one place and tells you each day what to change. It plans your gym sessions and you log them right in the app while you train. This guide walks you through installing it, what every part does, and the optional connections.</p>
 
@@ -70,8 +75,8 @@ footer{color:var(--muted);font-size:14px;text-align:center;margin-top:28px}
 </ol></nav>
 
 <section id="install">
-<p class="kick">Step 1 · 2 minutes</p>
 <h2>Install the <em>app</em></h2>
+<p class="sub">About 2 minutes, once.</p>
 <p>RCMP isn’t in the App Store. It’s a web app you add to your Home Screen, and from then on it opens like any other app.</p>
 <ol>
 <li>Open <a href="./">c26b8w67hc-jpg.github.io/rcpm</a> in <b>Safari</b> on your iPhone. Chrome works on Android.</li>
@@ -83,8 +88,8 @@ footer{color:var(--muted);font-size:14px;text-align:center;margin-top:28px}
 </section>
 
 <section id="wizard">
-<p class="kick">Step 2 · 3 minutes</p>
 <h2>The first-time <em>setup</em></h2>
+<p class="sub">About 3 minutes, right after installing.</p>
 <p>Five short screens. Your answers set your calories, protein and training program, so be honest. You can change everything later in Setup.</p>
 <table>
 <tr><th>Screen</th><th>What it’s used for</th></tr>
@@ -97,8 +102,8 @@ footer{color:var(--muted);font-size:14px;text-align:center;margin-top:28px}
 </section>
 
 <section id="gym">
-<p class="kick">Every gym day</p>
 <h2>In the <em>gym</em></h2>
+<p class="sub">Every gym day, in the Gym tab.</p>
 <p>RCMP builds your program from the first-time setup and tells you exactly what to do each session. You log it as you go, so there’s nothing to fill in afterwards.</p>
 <ol>
 <li>Open the <b>Gym</b> tab at the bottom (or tap <b>Start</b> on Today’s Training card). You see today’s session: exercises with a photo of each, sets, reps and weights. <b>Another option</b> shows a different day of your program.</li>
@@ -141,8 +146,8 @@ footer{color:var(--muted);font-size:14px;text-align:center;margin-top:28px}
 </section>
 
 <section id="health">
-<p class="kick">Optional · 5 minutes · best with an Apple Watch</p>
 <h2>Connect <em>Apple Health</em></h2>
+<p class="sub">Optional. About 5 minutes, and mainly worth it with an Apple Watch.</p>
 <p>This lets your iPhone and Apple Watch send numbers to RCMP every hour, so you don’t type them in. It’s worth it mainly <b>if you have an Apple Watch</b> (sleep, heart rate, runs and classes). With only an iPhone it adds just your step count, so you can skip it. It uses an app called <b>Health Auto Export</b>, which reads Apple Health and sends it to your private RCMP address. Your lifting is logged in RCMP itself either way.</p>
 
 <h3>What gets sent, and what RCMP does with it</h3>
@@ -175,8 +180,8 @@ footer{color:var(--muted);font-size:14px;text-align:center;margin-top:28px}
 </section>
 
 <section id="fitbod">
-<p class="kick">Optional · only if you’ve been using Fitbod</p>
 <h2>Bring your <em>Fitbod</em> history</h2>
+<p class="sub">Optional. Only if you’ve been using Fitbod.</p>
 <p>You don’t need Fitbod: RCMP plans and logs your sessions itself (see In the gym). But if you’ve lifted with Fitbod before, importing its history once means RCMP knows your weights from day one instead of starting blank.</p>
 <ol>
 <li>In Fitbod, open the <b>Log</b> tab and tap the <b>settings cog</b> (top right).</li>
