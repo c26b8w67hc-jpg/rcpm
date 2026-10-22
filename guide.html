@@ -1,0 +1,235 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0B0D17">
+<title>RCMP setup guide</title>
+<link rel="icon" href="icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0B0D17;--card:rgba(255,255,255,.055);--raise:rgba(255,255,255,.1);--ink:#F4F1EA;--muted:rgba(244,241,234,.66);--line:rgba(255,255,255,.08);--line2:rgba(255,255,255,.16);
+  --good:#7FD8BE;--warn:#FFB648;--hot:#A8A9FC;--on:#0B0D17;--r:20px;color-scheme:dark}
+*{box-sizing:border-box}
+html{background:var(--bg);-webkit-text-size-adjust:100%;scroll-padding-top:16px}
+body{margin:0;background:radial-gradient(120% 50% at 50% 0%,#1A1E3D 0%,var(--bg) 60%) fixed,var(--bg);color:var(--ink);font:16px/1.6 Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}
+main{max-width:640px;margin:0 auto;padding:max(28px,env(safe-area-inset-top)) 16px 64px}
+h1{font:300 36px/1.12 Inter,sans-serif;letter-spacing:-.02em;margin:18px 0 10px}
+h1 em,h2 em{font-family:"Instrument Serif",Georgia,serif;font-style:italic;font-weight:400}
+h2{font:400 26px/1.2 Inter,sans-serif;letter-spacing:-.01em;margin:0 0 6px}
+h3{font:600 16px/1.35 Inter,sans-serif;margin:22px 0 6px}
+p{margin:8px 0}
+.lead{color:var(--muted);font-size:17px}
+.brand{display:flex;align-items:center;gap:10px;font:600 14px/1 Inter,sans-serif;letter-spacing:.22em}
+.brand img{width:28px;height:28px;border-radius:50%}
+section{margin:18px 0;padding:22px 20px;border-radius:var(--r);background:var(--card);border:1px solid var(--line)}
+.kick{font:500 12px/1.2 Inter,sans-serif;letter-spacing:.08em;text-transform:uppercase;color:var(--good);margin:0 0 8px}
+ol,ul{padding-left:22px;margin:8px 0}
+li{margin:6px 0}
+li::marker{color:var(--muted)}
+b{font-weight:600}
+.muted{color:var(--muted)}
+.tag{display:inline-block;font:500 12px/1 Inter,sans-serif;padding:5px 9px;border-radius:999px;background:var(--raise);color:var(--ink);vertical-align:2px;margin-left:4px}
+.tag.must{background:var(--good);color:var(--on)}
+.note{margin:14px 0 0;padding:12px 14px;border-radius:14px;background:rgba(255,182,72,.1);border:1px solid rgba(255,182,72,.28);font-size:15px}
+.ok{margin:14px 0 0;padding:12px 14px;border-radius:14px;background:rgba(127,216,190,.1);border:1px solid rgba(127,216,190,.3);font-size:15px}
+nav ol{columns:2;column-gap:18px;font-size:15px;padding-left:20px}
+nav a,a{color:var(--hot);text-decoration:none}
+nav a:hover,a:hover{text-decoration:underline}
+table{width:100%;border-collapse:collapse;font-size:15px;margin-top:8px}
+th,td{text-align:left;vertical-align:top;padding:9px 8px 9px 0;border-top:1px solid var(--line)}
+th{font-weight:500;color:var(--muted);font-size:13px}
+td:first-child{white-space:nowrap;padding-right:12px}
+.btn{display:inline-block;margin-top:12px;padding:12px 20px;border-radius:999px;background:var(--ink);color:var(--on);font-weight:500}
+.btn:hover{text-decoration:none}
+footer{color:var(--muted);font-size:14px;text-align:center;margin-top:28px}
+@media (max-width:420px){nav ol{columns:1}h1{font-size:31px}td:first-child{white-space:normal}}
+</style>
+</head>
+<body>
+<main>
+<div class="brand"><img src="icon-192.png" alt="">RCMP</div>
+<h1>Set up RCMP <em>in 10 minutes</em></h1>
+<p class="lead">RCMP tracks your weight, food, training and recovery in one place and tells you each day what to change. This guide walks you through installing it, connecting your iPhone and Fitbod, and what every part of the app does.</p>
+
+<nav aria-label="Contents"><ol>
+<li><a href="#install">Install the app</a></li>
+<li><a href="#wizard">The first-time setup</a></li>
+<li><a href="#health">Connect Apple Health</a></li>
+<li><a href="#fitbod">Connect Fitbod</a></li>
+<li><a href="#today">The Today screen</a></li>
+<li><a href="#logging">Logging food and training</a></li>
+<li><a href="#progress">Progress</a></li>
+<li><a href="#coach">The coach</a></li>
+<li><a href="#setup">Setup</a></li>
+<li><a href="#privacy">Your data and privacy</a></li>
+<li><a href="#help">If something isn’t working</a></li>
+</ol></nav>
+
+<section id="install">
+<p class="kick">Step 1 · 2 minutes</p>
+<h2>Install the <em>app</em></h2>
+<p>RCMP isn’t in the App Store. It’s a web app you add to your Home Screen, and from then on it opens like any other app.</p>
+<ol>
+<li>Open <a href="./">c26b8w67hc-jpg.github.io/rcpm</a> in <b>Safari</b> on your iPhone. Chrome works on Android.</li>
+<li>Tap the <b>Share</b> button (the square with the arrow), then <b>Add to Home Screen</b>, then <b>Add</b>.</li>
+<li>Close Safari and open <b>RCMP from your Home Screen</b>.</li>
+<li>Enter your <b>invite code</b> (6 letters and numbers, from Bence), then your first name, then read and accept the privacy note.</li>
+</ol>
+<p class="note">Already joined in Safari before adding it to the Home Screen? The Home Screen app starts empty. Just enter the same code again: it keeps working for 24 hours after you first use it and signs you into the same account.</p>
+</section>
+
+<section id="wizard">
+<p class="kick">Step 2 · 3 minutes</p>
+<h2>The first-time <em>setup</em></h2>
+<p>Five short screens. Your answers set your calories, protein and training program, so be honest. You can change everything later in Setup.</p>
+<table>
+<tr><th>Screen</th><th>What it’s used for</th></tr>
+<tr><td><b>Goal</b></td><td><b>Build muscle</b> (a small calorie surplus), <b>Lose fat</b> (a steady deficit, high protein to keep muscle) or <b>Recomp</b> (about the same weight, less fat, more muscle).</td></tr>
+<tr><td><b>About you</b></td><td>Sex, age, height and today’s weight. These estimate how much you burn each day. The weight is also your first weigh-in.</td></tr>
+<tr><td><b>Training</b></td><td>Gym days a week (2–6) picks your program: full body for 2–3 days, upper/lower for 4, upper/lower plus arms for 5, push/pull/legs for 6. Experience sets the number of sets. “Where you train” picks exercises you can actually do (full gym, dumbbells at home, or bodyweight). Marking lower back, knees or shoulders keeps exercises that load them out of your program.</td></tr>
+<tr><td><b>Targets</b></td><td>Your daily calories, protein, carbs and fat, plus a goal weight and date. Edit them if you want. After about three weeks of logging, RCMP compares what you ate with what the scale did and suggests a corrected calorie target.</td></tr>
+<tr><td><b>Connect</b></td><td>Apple Health and Fitbod (the next two sections). You can skip and do it later in Setup.</td></tr>
+</table>
+</section>
+
+<section id="health">
+<p class="kick">Step 3 · 5 minutes <span class="tag must">Recommended</span></p>
+<h2>Connect <em>Apple Health</em></h2>
+<p>This lets your iPhone (and Apple Watch, if you have one) send numbers to RCMP every hour, so you don’t type them in. It uses an app called <b>Health Auto Export</b>, which reads Apple Health and sends it to your private RCMP address.</p>
+
+<h3>What gets sent, and what RCMP does with it</h3>
+<table>
+<tr><th>From Apple Health</th><th>Used for</th></tr>
+<tr><td>Steps</td><td>The Steps ring and the daily steps goal on To do.</td></tr>
+<tr><td>Weight, body fat</td><td>Fills in your weigh-in if you use a smart scale that writes to Health.</td></tr>
+<tr><td>Sleep <span class="muted">(watch)</span></td><td>The Sleep ring and the recovery advice.</td></tr>
+<tr><td>Resting heart rate, HRV <span class="muted">(watch)</span></td><td>Spots when you’re under-recovered, then the session suggestion holds your weights and drops a set.</td></tr>
+<tr><td>Active + resting energy <span class="muted">(watch)</span></td><td>What you burned, compared with what you ate.</td></tr>
+<tr><td>Workouts <span class="muted">(watch)</span></td><td>Runs, rides, Pilates and classes of 20+ minutes show up as sessions. Gym workouts give your Fitbod session its length and calories.</td></tr>
+</table>
+<p class="muted">No Apple Watch? Steps and weight still work. Sleep and heart numbers need a watch (or a sleep app that writes to Health).</p>
+
+<h3>How to set it up</h3>
+<ol>
+<li>In RCMP: <b>Setup › Your connections › Apple Health › Set up</b>, then tap <b>Copy address</b>. This is your private address; don’t share it.</li>
+<li>Install <b>Health Auto Export – JSON+CSV</b> from the App Store. The automatic sending (“Automations”) is part of its paid upgrade, so unlock that.</li>
+<li>Open it and allow access to Apple Health when it asks. Turn on everything in the list below.</li>
+<li>Go to <b>Automations</b>, tap <b>+</b> (new automation) and choose <b>REST API</b>.</li>
+<li><b>URL:</b> paste the address you copied.</li>
+<li><b>Data Type:</b> Health Metrics. Select: <b>Step Count, Weight &amp; Body Mass, Body Fat Percentage, Sleep Analysis, Resting Heart Rate, Heart Rate Variability, Active Energy, Resting Energy</b>.</li>
+<li><b>Export Format:</b> JSON. <b>Export Version:</b> Version 2. <b>Aggregate data / interval:</b> Days. <b>Sync cadence:</b> every hour.</li>
+<li>Turn the automation on and save it.</li>
+<li>Make a <b>second automation</b> exactly the same way, but with Data Type <b>Workouts</b>.</li>
+<li>Tap <b>Run now</b> (or <b>Manual export</b>) on each automation once so the first batch goes straight away.</li>
+</ol>
+<p class="ok"><b>Check it worked:</b> in RCMP, tap <b>Sync</b> at the top. Setup › Your connections should now say “Last delivery …”, and the Steps ring on Today fills in.</p>
+<p class="note">iPhone only lets apps send in the background now and then. If RCMP says “Apple Health went quiet”, open Health Auto Export once and it catches up.</p>
+</section>
+
+<section id="fitbod">
+<p class="kick">Step 4 · 2 minutes <span class="tag">If you use Fitbod</span></p>
+<h2>Connect <em>Fitbod</em></h2>
+<p>Fitbod has every set you’ve lifted. Importing it gives RCMP your lift history, and from that it calculates the weight and reps for your next session, flags new records and spots lifts that have stalled.</p>
+<ol>
+<li>In Fitbod, open the <b>Log</b> tab and tap the <b>settings cog</b> (top right).</li>
+<li>Scroll down to <b>Export Workout Data</b> and save the CSV file to Files (or email it to yourself).</li>
+<li>In RCMP: <b>Setup › Your connections › Fitbod › Import CSV</b> (or Progress › Training › Import Fitbod) and pick the file. Each day becomes one gym session with every working set.</li>
+</ol>
+<p>Fitbod can’t send automatically, so <b>export again once a week</b> (Sunday is a good habit). Importing again only adds or updates; nothing gets duplicated. RCMP reminds you on Today when a gym session from Apple Health has no exercises yet.</p>
+<p class="muted">Don’t use Fitbod? That’s fine: log sessions in RCMP itself (see Logging), or follow RCMP’s own program.</p>
+</section>
+
+<section id="today">
+<h2>The <em>Today</em> screen</h2>
+<table>
+<tr><th>Part</th><th>What it does</th></tr>
+<tr><td><b>Three rings</b></td><td>Sleep (hours of 8), Steps (of your goal) and Protein (of your target). Tap one to see the details.</td></tr>
+<tr><td><b>Daily call</b></td><td>One thing to do today, picked from your numbers: weigh in, protein short, behind pace, recover, a lift that stalled. It starts after <b>14 days</b> of logging (at least 7 weigh-ins and 7 food days) so it’s based on real data.</td></tr>
+<tr><td><b>To do</b></td><td>Weigh in, hit protein, train, supplements, steps, and on Sundays a body check-in (waist and neck tape, optional photos).</td></tr>
+<tr><td><b>Calendar</b></td><td>The last five weeks; each training day is coloured by type.</td></tr>
+<tr><td><b>Fuel</b></td><td>Calories and macros left today. Training days get a few more carbs, rest days fewer (same weekly total).</td></tr>
+<tr><td><b>Training</b></td><td>Today’s sessions, plus <b>Suggest</b> for today’s workout.</td></tr>
+<tr><td><b>Stack, Also today</b></td><td>Tick supplements, and flag alcohol or late caffeine. RCMP can later show what these do to your sleep.</td></tr>
+</table>
+<p class="muted">The arrows at the top move to earlier days, so you can fill in a day you missed.</p>
+</section>
+
+<section id="logging">
+<h2>Logging food and <em>training</em></h2>
+<h3>Food</h3>
+<ul>
+<li><b>Add meal</b>, then search a food (basics are built in in English and Spanish, and supermarket products come from Open Food Facts). Pick it and type the grams.</li>
+<li>Or describe the meal in words (“chicken, rice and salad, a big plate”) and let the AI estimate it.</li>
+<li><b>Eat it again</b> re-adds a meal you’ve logged before in one tap. Most days are repeats, so this gets fast.</li>
+<li><b>Suggest</b> on the Fuel card picks one of your usual meals that fits what’s left today.</li>
+</ul>
+<h3>Training</h3>
+<ul>
+<li><b>Suggest</b> on the Training card shows today’s session from your program: exercises, sets, reps and weights, each with a short form cue. Tap <b>Log as today’s session</b>, adjust it to what you actually did, and save after training.</li>
+<li>Weights follow <b>double progression</b>: stay at a weight until every set hits the top of the rep range, then the next session adds the smallest jump.</li>
+<li>No weight shown yet? Pick one you could do two more reps with. From your second session on, RCMP fills it in.</li>
+<li><b>Add session</b> logs anything else: a class, a run, a gym session by hand.</li>
+</ul>
+</section>
+
+<section id="progress">
+<h2><em>Progress</em></h2>
+<ul>
+<li><b>Weight:</b> the 7-day average (daily weight jumps 1 kg on water alone, so the average is what counts), pace toward your goal, and body measurements with a body-fat estimate.</li>
+<li><b>Training:</b> your program, the week ahead, sessions per week and each lift’s progress.</li>
+<li><b>Food:</b> your averages, and after three weeks your real daily burn and a corrected calorie target.</li>
+<li><b>Recovery:</b> sleep, resting heart rate and HRV against your own normal.</li>
+<li><b>Lab:</b> small experiments (does late coffee hurt your sleep?) scored on your own data.</li>
+</ul>
+</section>
+
+<section id="coach">
+<h2>The <em>coach</em></h2>
+<p>Ask anything in the Coach tab: “how much protein should I eat?”, “what should I train today?”, “alternative to bench press”, “my knee hurts on squats”. Common questions are answered instantly from your own numbers. The AI coach takes the rest, within a small monthly budget that resets on the 1st (Setup shows how much is left). The built-in answers always work.</p>
+<p class="muted">For pain or injuries the coach will always point you to a physio or doctor.</p>
+</section>
+
+<section id="setup">
+<h2><em>Setup</em></h2>
+<ul>
+<li><b>Account:</b> who you’re signed in as, and the AI budget left this month.</li>
+<li><b>Your connections:</b> Apple Health and Fitbod.</li>
+<li><b>Daily targets, Goal:</b> calories, macros, goal weight and date, gym days, steps goal, carb cycling on or off.</li>
+<li><b>Profile and program:</b> goal type, body, experience, equipment, joints to go easy on, city and supermarket (used for meal plans). <b>Recalculate targets</b> redoes your calories from your latest weight.</li>
+<li><b>Supplement stack:</b> what you take, so you can tick it off daily.</li>
+<li><b>Your data:</b> download a backup any time.</li>
+</ul>
+</section>
+
+<section id="privacy">
+<h2>Your data and <em>privacy</em></h2>
+<ul>
+<li>Your log is stored privately in a Google Drive folder that belongs to Bence, who runs RCMP. Only you and Bence can technically access it; it isn’t shared with anyone else.</li>
+<li>Apple Health numbers you send are copied into that same folder.</li>
+<li>When the AI coach answers, your question and the relevant numbers go to Anthropic’s Claude API. Built-in answers never leave the app.</li>
+<li>Ask Bence any time to export or delete your data.</li>
+</ul>
+</section>
+
+<section id="help">
+<h2>If something isn’t <em>working</em></h2>
+<table>
+<tr><th>Problem</th><th>Fix</th></tr>
+<tr><td>New phone, or the app lost your account</td><td>Ask Bence for a <b>sign-in code</b>. Enter it on the join screen; your log comes back.</td></tr>
+<tr><td>Code “isn’t valid”</td><td>Codes last 14 days. Ask for a new one.</td></tr>
+<tr><td>Steps or sleep not arriving</td><td>Open Health Auto Export once. Check both automations are on, the URL is your RCMP address, and Health access is allowed (iPhone Settings › Health › Data Access › Health Auto Export).</td></tr>
+<tr><td>Sleep and heart numbers empty</td><td>These need an Apple Watch (or a sleep app writing to Health).</td></tr>
+<tr><td>Gym session shows “No exercises”</td><td>That came from Apple Health. Export Fitbod again and import the CSV.</td></tr>
+<tr><td>Calories feel wrong</td><td>Log fully for three weeks; RCMP then suggests a target from what really happened. Or change it in Setup.</td></tr>
+<tr><td>Something else</td><td>Message Bence.</td></tr>
+</table>
+<a class="btn" href="./">Open RCMP</a>
+</section>
+
+<footer>RCMP · made by Bence for friends</footer>
+</main>
+</body>
+</html>

@@ -527,7 +527,7 @@ body.gate{padding-bottom:env(safe-area-inset-bottom,0px)}
 .conn-r>div{display:flex;flex-direction:column;gap:2px;min-width:0}
 .conn-r small{font-size:13px;color:var(--muted)}
 .conn-how{padding:4px 0 12px}
-.conn-how a{color:var(--hot)}
+.conn-how a,.note a{color:var(--hot)}
 .invite{margin-top:14px;padding:14px;border-radius:var(--r-sm);background:rgba(127,216,190,.1);border:1px solid rgba(127,216,190,.3)}
 .invite-c{font:300 34px/1 var(--f);letter-spacing:.18em;margin:4px 0 0}
 .msg-src{display:block;margin-top:6px;font-size:12px;color:var(--muted)}
@@ -2760,7 +2760,7 @@ function qaAnswer(q){const lo=' '+String(q||'').toLowerCase()+' ';
 
 /* ---------- friends: joining with an invite code, the onboarding wizard, connections, the owner's panel ---------- */
 const BACKEND='https://script.google.com/macros/s/AKfycbwbARdb3Ntyv-Zb48F4WRFe2CRySCFB9Rz3j-pTqn6Wf52hUPUu0xaQotLkY_HJ705z/exec';
-const APP_URL='https://c26b8w67hc-jpg.github.io/rcpm/',OWNER='Bence';
+const APP_URL='https://c26b8w67hc-jpg.github.io/rcpm/',OWNER='Bence',GUIDE=APP_URL+'guide.html';
 const JOIN_Q=(()=>{try{return (new URLSearchParams(location.search).get('join')||'').toUpperCase().replace(/[^A-Z0-9]/g,'')}catch(e){return ''}})();
 const localOnly=()=>{try{return localStorage.getItem('rcmp.localOnly')==='1'}catch(e){return false}};
 // the join screen: the installable app without an account (opened locally it stays the old local app unless there's a ?join= link)
@@ -2838,7 +2838,7 @@ function onboardView(){const o=obInit(),st=S.settings,dots=`<div class="ob-dots"
     <div class="g2" style="margin-top:14px">${['kcal','protein','carbs','fat'].map(k=>`<label>${{kcal:'Calories',protein:'Protein (g)',carbs:'Carbs (g)',fat:'Fat (g)'}[k]}<input data-obt="${k}" id="obt_${k}" value="${t[k]}" inputmode="decimal" autocomplete="off"></label>`).join('')}</div>
     <div class="g2" style="margin-top:12px"><label>Goal weight (kg)<input data-obt="goalKg" id="obt_goalKg" value="${t.goalKg}" inputmode="decimal"></label><label>By<input data-obt="goalDate" id="obt_goalDate" type="date" value="${t.goalDate}"></label></div>
     <p class="note">Program: <b>${esc(p.name)}</b> for ${esc(EQUIPMENT[o.equip])}. Each session shows the exercises, sets and weights, and adds weight when you hit the top of the reps.</p>${nav('obSave','Save and continue')}`}
-  else body=`<h2 class="gate-t">Connect your <em>data</em></h2><p class="note">All optional, and you can do it later in Setup.</p>${connectionsCard(true)}
+  else body=`<h2 class="gate-t">Connect your <em>data</em></h2><p class="note">All optional, and you can do it later in Setup. The <a href="${GUIDE}#health" target="_blank" rel="noopener">setup guide</a> walks through each one.</p>${connectionsCard(true)}
     <div class="actions"><button class="btn primary" data-a="obDone">Start using RCMP</button></div>`;
   return `<section class="gate-v ob">${dots}${body}</section>`}
 async function obSave(){const o=OB,t=o.t,st=S.settings,days=Math.max(2,Math.min(6,+o.days||3));
@@ -2864,7 +2864,7 @@ function connectionsCard(inWizard){if(!isFriend())return '';const m=ME||{},o=m.o
       ${m.shortcut?`<p class="note"><b>Free way, with the RCMP Shortcut:</b></p><ol class="steps"><li><a href="${esc(m.shortcut)}" target="_blank" rel="noopener">Get the RCMP Shortcut</a> and paste the address above when it asks.</li><li>Shortcuts → Automation → New → Time of Day (say 22:00, daily) → Run Shortcut → RCMP Health, and turn off Ask Before Running.</li></ol>`:''}
       <p class="note"><b>${m.shortcut?'Fully automatic':'Automatic'}, with Health Auto Export</b> (an App Store app; automations are its paid feature):</p>
       <ol class="steps"><li>Automations → New Automation → REST API. Paste the address as the URL.</li><li>Export format JSON, version 2. Data type Health Metrics, and pick: Step Count, Weight &amp; Body Mass, Body Fat Percentage, Sleep Analysis, Resting Heart Rate, Heart Rate Variability, Active Energy, Resting Energy. (Sleep and heart need an Apple Watch or a sleep app writing to Health; the rest works with just the iPhone.)</li><li>Make a second automation, the same way, with data type Workouts: your runs, rides and classes then show up as sessions, and gym sessions get their length and calories.</li><li>Aggregation: Day. Sync cadence: every hour. Turn it on.</li></ol>
-      <p class="note">Keep the address to yourself: anyone with it could add numbers to your log.</p></div>`:''}
+      <p class="note">Keep the address to yourself: anyone with it could add numbers to your log. Step-by-step help: <a href="${GUIDE}#health" target="_blank" rel="noopener">setup guide</a>.</p></div>`:''}
     <div class="conn-r"><div><b>Fitbod</b><small>${Object.values(S.workouts).some(w=>w.source==='fitbod-csv')?'Imported. Export again any time to add new sessions.':'Your lifting history, set by set, from a CSV export.'}</small></div><button class="btn small" data-a="openFitbod">Import CSV</button></div></section>`}
 let healthOpen=false;
 async function ouraConnect(){const w=window.open('','_blank');
@@ -2881,7 +2881,7 @@ let signOutAsk=false;
 function accountCard(){const m=ME||{},a=m.ai||{};const left=a.cap?Math.max(0,1-(a.spent||0)/a.cap):null;
   return `<section class="card"><div class="card-h"><h2>Account</h2><span class="aside">${outbox.length?outbox.length+' edits waiting':'Synced'}</span></div>
     <dl class="spec"><div><dt>Signed in as</dt><dd>${esc(S.settings.name||m.name||'')}</dd></div>${left!=null?`<div><dt>AI coach this month</dt><dd><b>${Math.round(left*100)}</b>% left</dd></div>`:''}</dl>
-    <p class="note">Most coach answers are built in and free. The AI answers the rest within a small monthly budget that resets on the 1st.</p>
+    <p class="note">Most coach answers are built in and free. The AI answers the rest within a small monthly budget that resets on the 1st. How everything works: <a href="${GUIDE}" target="_blank" rel="noopener">the setup guide</a>.</p>
     <div class="actions"><button class="btn small" data-a="signOut">${signOutAsk?'Tap again to sign out':'Sign out on this device'}</button></div></section>`}
 function signOut(){if(!signOutAsk){signOutAsk=true;render();setTimeout(()=>{signOutAsk=false;schedule()},4000);return}
   if(outbox.length){toast('Some edits haven’t synced yet. Connect to the internet first.');signOutAsk=false;render();return}
@@ -2890,7 +2890,7 @@ function signOut(){if(!signOutAsk){signOutAsk=true;render();setTimeout(()=>{sign
 /* owner: invite friends, see how they're doing, remove them */
 let FR={data:null,busy:false,err:'',code:null,codeFor:null,ask:null};
 async function frLoad(){if(FR.busy)return;FR.busy=true;FR.err='';schedule();try{FR.data=await gas('friends')}catch(e){FR.err=e.message||'Couldn’t load your friends'}FR.busy=false;schedule()}
-const inviteText=c=>`Join me on RCMP, my training and nutrition tracker. Open ${APP_URL}?join=${c} on your phone, add it to your Home Screen, and enter the code ${c}. The code works for 14 days.`;
+const inviteText=c=>`Join me on RCMP, my training and nutrition tracker. Open ${APP_URL}?join=${c} on your phone, add it to your Home Screen, and enter the code ${c}. The code works for 14 days. Setup guide: ${GUIDE}`;
 function friendsCard(){if(!isOwnerGas())return '';if(!FR.data&&!FR.busy&&!FR.err)setTimeout(frLoad,0);const d=FR.data;
   const when=t=>t?ago(t):'never';
   const users=d?d.users.filter(u=>!u.revoked):[],gone=d?d.users.filter(u=>u.revoked):[];
