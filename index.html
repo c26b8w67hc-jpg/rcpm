@@ -2991,7 +2991,7 @@ VIEWS.gym=function(){
         <input id="lv_${i}_${j}_kg" data-lv="${i}:${j}:kg" value="${esc(s.kg??'')}" inputmode="decimal" autocomplete="off" placeholder="–" aria-label="Set ${j+1} weight in kg">
         <input id="lv_${i}_${j}_reps" data-lv="${i}:${j}:reps" value="${esc(s.reps??'')}" inputmode="numeric" autocomplete="off" placeholder="–" aria-label="Set ${j+1} reps">
         <button class="lv-tick" data-a="lvTick" data-i="${i}" data-j="${j}" aria-pressed="${!!s.done}" aria-label="Set ${j+1} ${s.done?'done':'not done'}"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></button></div>`).join('')}</div>
-      <div class="lv-ex-a"><button class="btn small" data-a="lvAddSet" data-i="${i}">Add set</button><button class="btn small ghost" data-a="lvSwap" data-i="${i}">Swap</button><button class="btn small ghost" data-a="lvRm" data-i="${i}">Remove</button></div></section>`}).join('')}
+      <div class="lv-ex-a"><button class="btn small" data-a="lvAddSet" data-i="${i}">Add set</button>${e.sets.length>1?`<button class="btn small" data-a="lvRmSet" data-i="${i}" aria-label="Remove a set from ${esc(e.name)}">Remove set</button>`:''}<button class="btn small ghost" data-a="lvSwap" data-i="${i}">Swap</button><button class="btn small ghost" data-a="lvRm" data-i="${i}">Remove exercise</button></div></section>`}).join('')}
   <div class="actions" style="margin-bottom:12px"><button class="btn" data-a="lvAdd">Add exercise</button><button class="btn ghost" data-a="lvDiscard">${lvDiscardAsk?'Tap again to discard':'Discard session'}</button></div>
   ${left!=null?`<div class="lv-rest${left<=0?' lv-go':''}" id="lvRest" role="timer" aria-live="off"><i class="lv-rest-p" style="width:${Math.max(0,Math.min(100,left/LIVE.restFor*100))}%"></i>
     <span class="lv-rest-l">Rest</span><b class="lv-rest-t">${left>0?mmss(left):'Go'}</b><button data-a="lvRestAdj" data-d="-15">−15</button><button data-a="lvRestAdj" data-d="15">+15</button><button data-a="lvRestSkip">Skip</button></div>`:''}`};
@@ -3271,6 +3271,9 @@ const A={
   lvStartSug:()=>lvStart(lastSuggest&&lastSuggest.r),lvStartEmpty:()=>lvStart(null),lvOpen:()=>lvOpen(),
   lvTick:b=>lvTick(+b.dataset.i,+b.dataset.j),
   lvAddSet:b=>{const e=LIVE.ex[+b.dataset.i],l=e.sets[e.sets.length-1];e.sets.push({kg:l?l.kg:'',reps:l?l.reps:'',done:false});lvSave();render()},
+  // the last set you haven't ticked goes first (4 planned → 3); if every set is ticked, the last one
+  lvRmSet:b=>{const i=+b.dataset.i,e=LIVE.ex[i];if(!e||e.sets.length<2)return;let j=-1;for(let k=e.sets.length-1;k>=0;k--)if(!e.sets[k].done){j=k;break}if(j<0)j=e.sets.length-1;
+    const x=e.sets.splice(j,1)[0];lvSave();render();toast(`Set ${j+1} removed`,()=>{e.sets.splice(j,0,x);lvSave();render()})},
   lvRm:b=>{const i=+b.dataset.i,x=LIVE.ex[i];LIVE.ex.splice(i,1);lvSave();render();toast(x.name+' removed',()=>{LIVE.ex.splice(i,0,x);lvSave();render()})},
   lvSwap:b=>lvPicker('swap',+b.dataset.i),lvAdd:()=>lvPicker('add'),lvPick:b=>lvPick(b.dataset.n,b.dataset.m,b.dataset.i===''?null:+b.dataset.i),
   lvFinish:()=>lvFinish(),
