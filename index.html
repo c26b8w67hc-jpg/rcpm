@@ -564,7 +564,14 @@ body.live{padding-bottom:calc(160px + env(safe-area-inset-bottom,0px))}
 @media (prefers-reduced-motion:reduce){.ex-pic img+img,.ex-thumb img+img{animation:none;opacity:0}}
 .lv-cue{margin:10px 0 0;font-size:14px;color:var(--muted)}.lv-cue summary{cursor:pointer;color:var(--ink);font-size:13px}.lv-cue p{margin:6px 0 0}
 .lv-sets{margin-top:10px}
-.lv-row{display:grid;grid-template-columns:34px 1fr 1fr 48px;gap:8px;align-items:center;padding:4px 0}
+.lv-sw{position:relative;overflow:hidden;border-radius:var(--r-sm)}
+.lv-row{display:grid;grid-template-columns:34px 1fr 1fr 48px;gap:8px;align-items:center;padding:4px 0;position:relative;z-index:1;touch-action:pan-y;transition:transform .25s var(--ease)}
+.lv-row *{touch-action:pan-y}
+.lv-sw.open .lv-row{transform:translateX(-80px)}
+.lv-del{position:absolute;right:0;top:4px;bottom:4px;width:72px;border:0;border-radius:var(--r-sm);background:var(--danger);color:var(--on);display:grid;place-items:center;opacity:0;transition:opacity .2s var(--ease)}
+.lv-sw.open .lv-del{opacity:1}
+.lv-del svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+@media (prefers-reduced-motion:reduce){.lv-row{transition:none}}
 .lv-row input{min-height:44px;text-align:center;font-variant-numeric:tabular-nums}
 .lv-hd{font-size:12px;color:var(--muted);padding:0}.lv-hd span{text-align:center}.lv-hd span:first-child{text-align:left}
 .lv-n{font:300 20px/1 var(--f);color:var(--muted)}
@@ -2968,6 +2975,27 @@ function lvTick(i,j){lvUnlock();const e=LIVE.ex[i],s=e&&e.sets[j];if(!s)return;
   if(s.done){const n=e.sets[j+1];if(n&&!n.done){if(n.kg===''||n.kg==null)n.kg=s.kg;if(n.reps===''||n.reps==null)n.reps=s.reps}
     const last=LIVE.ex.every(x=>x.sets.every(y=>y.done));if(!last){LIVE.restFor=e.rest||90;LIVE.restEnd=Date.now()+LIVE.restFor*1000;lvBeeped=false}}
   lvSave();render()}
+// swipe a set row left to reveal its delete button; one open at a time, tap elsewhere or swipe back to close
+let lvSwOpen=null;const LV_DEL=80;
+function lvDelSet(i,j){const e=LIVE.ex[i];if(!e||!e.sets[j])return;const x=e.sets.splice(j,1)[0];lvSwOpen=null;lvSave();render();
+  toast(`Set ${j+1} deleted`,()=>{e.sets.splice(j,0,x);lvSave();render()})}
+(()=>{let g=null;
+  const row=sw=>sw&&sw.querySelector('.lv-row');
+  const setX=(sw,x,anim)=>{const r=row(sw),d=sw.querySelector('.lv-del');r.style.transition=anim?'':'none';r.style.transform=x?`translateX(${x}px)`:'';d.style.opacity=Math.min(1,-x/LV_DEL)};
+  document.addEventListener('pointerdown',e=>{const sw=e.target.closest&&e.target.closest('.lv-sw');
+    if(lvSwOpen&&(!sw||sw.dataset.sw!==lvSwOpen)&&!e.target.closest('.lv-del')){const o=document.querySelector(`.lv-sw[data-sw="${lvSwOpen}"]`);lvSwOpen=null;if(o){o.classList.remove('open');setX(o,0,true)}}
+    if(!sw||e.target.closest('.lv-del')||e.pointerType==='mouse'&&e.button!==0)return;
+    g={sw,x0:e.clientX,y0:e.clientY,base:sw.classList.contains('open')?-LV_DEL:0,dx:0,on:false}},true);
+  document.addEventListener('pointermove',e=>{if(!g)return;const dx=e.clientX-g.x0,dy=e.clientY-g.y0;
+    if(!g.on){if(Math.abs(dx)<10)return;if(Math.abs(dy)>Math.abs(dx)){g=null;return}g.on=true;if(document.activeElement&&g.sw.contains(document.activeElement))document.activeElement.blur()}
+    g.dx=dx;setX(g.sw,Math.max(-LV_DEL-24,Math.min(0,g.base+dx)),false)},{passive:true});
+  const end=()=>{if(!g)return;const {sw,on,base,dx}=g;g=null;if(!on)return;const open=base+dx<-LV_DEL/2;
+    sw.classList.toggle('open',open);lvSwOpen=open?sw.dataset.sw:null;setX(sw,open?-LV_DEL:0,true);
+    const d=sw.querySelector('.lv-del');d.tabIndex=open?0:-1;
+    // a swipe must not also count as a tap on the field or tick under the finger
+    const stop=ev=>{ev.stopPropagation();ev.preventDefault()};sw.addEventListener('click',stop,{capture:true,once:true});setTimeout(()=>sw.removeEventListener('click',stop,{capture:true}),350)};
+  document.addEventListener('pointerup',end,true);document.addEventListener('pointercancel',()=>{if(g&&g.on){g.dx=0;end()}g=null},true);
+})();
 function lvRestAdj(d){if(!LIVE||!LIVE.restEnd)return;LIVE.restEnd+=d*1000;LIVE.restFor=Math.max(15,LIVE.restFor+d);lvBeeped=false;lvSave();render()}
 let lvFinishAsk=false,lvDiscardAsk=false;
 // the Gym tab: today's session to start, or the running one
@@ -2987,10 +3015,10 @@ VIEWS.gym=function(){
       <button class="lv-last linkbtn" data-a="lvHist" data-n="${esc(e.name)}"><span>${last||'No history yet'}</span><span class="lv-last-a">History</span></button>
       ${x||e.note?`<details class="lv-cue"><summary>How to</summary><p>${esc(x?x.cue:'')}${e.note&&!(x&&e.note.includes(x.cue))?' '+esc(e.note.split(' · ')[0]):''}</p></details>`:''}
       <div class="lv-sets"><div class="lv-row lv-hd"><span>Set</span><span>kg</span><span>Reps</span><span></span></div>
-      ${e.sets.map((s,j)=>`<div class="lv-row${s.done?' lv-ok':''}"><span class="lv-n">${j+1}</span>
+      ${e.sets.map((s,j)=>`<div class="lv-sw${lvSwOpen===i+':'+j?' open':''}" data-sw="${i}:${j}"><button class="lv-del" data-a="lvDelSet" data-i="${i}" data-j="${j}" aria-label="Delete set ${j+1}" tabindex="${lvSwOpen===i+':'+j?0:-1}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4h6v3"/></svg></button><div class="lv-row${s.done?' lv-ok':''}"><span class="lv-n">${j+1}</span>
         <input id="lv_${i}_${j}_kg" data-lv="${i}:${j}:kg" value="${esc(s.kg??'')}" inputmode="decimal" autocomplete="off" placeholder="–" aria-label="Set ${j+1} weight in kg">
         <input id="lv_${i}_${j}_reps" data-lv="${i}:${j}:reps" value="${esc(s.reps??'')}" inputmode="numeric" autocomplete="off" placeholder="–" aria-label="Set ${j+1} reps">
-        <button class="lv-tick" data-a="lvTick" data-i="${i}" data-j="${j}" aria-pressed="${!!s.done}" aria-label="Set ${j+1} ${s.done?'done':'not done'}"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></button></div>`).join('')}</div>
+        <button class="lv-tick" data-a="lvTick" data-i="${i}" data-j="${j}" aria-pressed="${!!s.done}" aria-label="Set ${j+1} ${s.done?'done':'not done'}"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></button></div></div>`).join('')}</div>
       <div class="lv-ex-a"><button class="btn small" data-a="lvAddSet" data-i="${i}">Add set</button>${e.sets.length>1?`<button class="btn small" data-a="lvRmSet" data-i="${i}" aria-label="Remove a set from ${esc(e.name)}">Remove set</button>`:''}<button class="btn small ghost" data-a="lvSwap" data-i="${i}">Swap</button><button class="btn small ghost" data-a="lvRm" data-i="${i}">Remove exercise</button></div></section>`}).join('')}
   <div class="actions" style="margin-bottom:12px"><button class="btn" data-a="lvAdd">Add exercise</button><button class="btn ghost" data-a="lvDiscard">${lvDiscardAsk?'Tap again to discard':'Discard session'}</button></div>
   ${left!=null?`<div class="lv-rest${left<=0?' lv-go':''}" id="lvRest" role="timer" aria-live="off"><i class="lv-rest-p" style="width:${Math.max(0,Math.min(100,left/LIVE.restFor*100))}%"></i>
@@ -3272,7 +3300,8 @@ const A={
   lvTick:b=>lvTick(+b.dataset.i,+b.dataset.j),
   lvAddSet:b=>{const e=LIVE.ex[+b.dataset.i],l=e.sets[e.sets.length-1];e.sets.push({kg:l?l.kg:'',reps:l?l.reps:'',done:false});lvSave();render()},
   // the last set you haven't ticked goes first (4 planned → 3); if every set is ticked, the last one
-  lvRmSet:b=>{const i=+b.dataset.i,e=LIVE.ex[i];if(!e||e.sets.length<2)return;let j=-1;for(let k=e.sets.length-1;k>=0;k--)if(!e.sets[k].done){j=k;break}if(j<0)j=e.sets.length-1;
+  lvDelSet:b=>lvDelSet(+b.dataset.i,+b.dataset.j),
+  lvRmSet:b=>{const i=+b.dataset.i,e=LIVE.ex[i];if(!e||e.sets.length<2)return;lvSwOpen=null;let j=-1;for(let k=e.sets.length-1;k>=0;k--)if(!e.sets[k].done){j=k;break}if(j<0)j=e.sets.length-1;
     const x=e.sets.splice(j,1)[0];lvSave();render();toast(`Set ${j+1} removed`,()=>{e.sets.splice(j,0,x);lvSave();render()})},
   lvRm:b=>{const i=+b.dataset.i,x=LIVE.ex[i];LIVE.ex.splice(i,1);lvSave();render();toast(x.name+' removed',()=>{LIVE.ex.splice(i,0,x);lvSave();render()})},
   lvSwap:b=>lvPicker('swap',+b.dataset.i),lvAdd:()=>lvPicker('add'),lvPick:b=>lvPick(b.dataset.n,b.dataset.m,b.dataset.i===''?null:+b.dataset.i),
